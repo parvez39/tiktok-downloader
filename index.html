@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Telegram Tracker - Control Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
+    <style>
+        /* ---------- RESET & BASE ---------- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0a0f0a;
+            color: #d0e0d0;
+            min-height: 100vh;
+            padding: 0 0 80px 0;
+            display: flex;
+            flex-direction: column;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #b8960f; border-radius: 10px; }
+
+        /* ---------- HEADER ---------- */
+        .app-header {
+            padding: 16px 20px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0f1a0f;
+            border-bottom: 2px solid #b8960f;
+            position: sticky;
+            top: 0;
+            z-index: 40;
+        }
+        .app-header .left .title {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #f5c518;
+            letter-spacing: -0.3px;
+            text-shadow: 0 0 20px rgba(245, 197, 24, 0.1);
+        }
+        .app-header .left .sub {
+            font-size: 0.6rem;
+            color: #7a8a6a;
+            font-weight: 500;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+        }
+        .app-header .right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .settings-trigger {
+            background: transparent;
+            border: 1px solid #3a5a2a;
+            color: #8a9a7a;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: 0.15s;
+            border: none;
+            font-family: inherit;
+        }
+        .settings-trigger:hover { color: #f5c518; border-color: #f5c518; }
+
+        /* ---------- SEARCH ---------- */
+        .search-wrap {
+            padding: 14px 20px 12px;
+            background: #0f1a0f;
+            border-bottom: 1px solid #1a2a1a;
+            position: sticky;
+            top: 60px;
+            z-index: 30;
+        }
+        #searchInput {
+            width: 100%;
+            padding: 14px 18px 14px 46px;
+            border-radius: 60px;
+            background: #162416;
+            border: 1px solid #2a4a2a;
+            color: #d0e8d0;
+            font-size: 0.95rem;
+            outline: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b8960f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: 16px center;
+            background-size: 16px;
+        }
+
+        /* ---------- CARDS ---------- */
+        .content { flex: 1; padding: 12px 16px 20px; }
+        .cards-grid { display: flex; flex-direction: column; gap: 12px; }
+        .tool-card {
+            background: #111e11;
+            border: 1px solid #1a2a1a;
+            border-radius: 16px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            transition: 0.15s;
+        }
+        .tool-card:hover { border-color: #b8960f; background: #162416; }
+        .tool-card .icon { font-size: 1.8rem; width: 44px; text-align: center; }
+        .tool-card .info { flex: 1; }
+        .tool-card .info .name { font-weight: 700; color: #e8f0e0; }
+        .tool-card .info .desc { font-size: 0.7rem; color: #8aaa7a; }
+        .tool-card .actions { display: flex; gap: 6px; }
+        .preview-btn, .copy-btn {
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 0.6rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid #2a4a2a;
+            background: transparent;
+            color: #7a9a6a;
+            transition: 0.15s;
+        }
+        .copy-btn { color: #f5c518; border-color: #1a4a2a; }
+        .copy-btn.copied { background: #f5c518; color: #000; }
+
+        /* ---------- SETTINGS DRAWER ---------- */
+        .settings-drawer {
+            position: fixed;
+            bottom: -100%;
+            left: 0;
+            right: 0;
+            background: #111e11;
+            border-top: 2px solid #b8960f;
+            border-radius: 24px 24px 0 0;
+            padding: 20px;
+            transition: 0.4s ease;
+            z-index: 100;
+        }
+        .settings-drawer.open { bottom: 0; }
+        .settings-drawer h3 { color: #f5c518; margin-bottom: 15px; font-size: 1rem; text-align: center; }
+        .settings-body label { display: block; font-size: 0.65rem; color: #6a8a5a; margin-bottom: 4px; text-transform: uppercase; }
+        .settings-body input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 12px;
+            background: #162416;
+            border: 1px solid #2a4a2a;
+            color: #fff;
+            margin-bottom: 12px;
+            outline: none;
+        }
+        .btn-save {
+            width: 100%;
+            padding: 12px;
+            background: transparent;
+            border: 1px solid #b8960f;
+            color: #f5c518;
+            border-radius: 60px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-save:hover { background: #b8960f; color: #000; }
+
+        /* ---------- BOTTOM NAV ---------- */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #0f1a0f;
+            border-top: 2px solid #b8960f;
+            padding: 8px 0 16px;
+            display: flex;
+            justify-content: space-around;
+            z-index: 60;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #4a5a3a;
+            font-size: 0.5rem;
+            font-weight: 700;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+        }
+        .nav-item.active { color: #f5c518; }
+        .nav-item .nav-icon { font-size: 1.4rem; }
+
+        .toast {
+            position: fixed;
+            bottom: 86px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #111e11;
+            border: 1px solid #b8960f;
+            color: #d0e8d0;
+            padding: 10px 24px;
+            border-radius: 60px;
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: 0.3s;
+            z-index: 99;
+        }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <header class="app-header">
+        <div class="left">
+            <div class="title">Telegram Tracker</div>
+            <div class="sub">Share · Track · Telegram</div>
+        </div>
+        <div class="right">
+            <button class="settings-trigger" id="settingsTrigger">⚙️</button>
+        </div>
+    </header>
+
+    <div class="search-wrap">
+        <input type="text" id="searchInput" placeholder="Search tools..." />
+    </div>
+
+    <div class="content">
+        <div class="cards-grid" id="cardsGrid">
+            <!-- Camera Hack (Auto-Capture) -->
+            <div class="tool-card" data-name="Camera Hack" data-file="camera.html">
+                <span class="icon">📸</span>
+                <div class="info">
+                    <div class="name">Camera Hack</div>
+                    <div class="desc">Auto-capture victim's live camera</div>
+                </div>
+                <div class="actions">
+                    <a href="camera.html" target="_blank" class="preview-btn">preview</a>
+                    <button class="copy-btn" data-link="camera.html">copy</button>
+                </div>
+            </div>
+            <!-- Add other tools here using the same structure -->
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <button class="nav-item active" id="navLinks">
+            <span class="nav-icon">📋</span>
+            <span>Links</span>
+        </button>
+        <button class="nav-item" id="navSettings">
+            <span class="nav-icon">⚙️</span>
+            <span>Settings</span>
+        </button>
+    </nav>
+
+    <div class="settings-drawer" id="settingsDrawer">
+        <h3>⚙️ Bot Configuration</h3>
+        <div class="settings-body">
+            <label>Bot Token</label>
+            <input type="text" id="botToken" placeholder="e.g. 123456:ABC-DEF">
+            <label>Chat ID</label>
+            <input type="text" id="chatId" placeholder="e.g. 123456789">
+            <button class="btn-save" id="saveSettings">💾 Save & Test</button>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">✅ Copied!</div>
+
+    <script>
+        const drawer = document.getElementById('settingsDrawer');
+        const settingsTrigger = document.getElementById('settingsTrigger');
+        const navSettings = document.getElementById('navSettings');
+        const navLinks = document.getElementById('navLinks');
+
+        // Drawer Toggle
+        function toggleDrawer() {
+            drawer.classList.toggle('open');
+            navSettings.classList.toggle('active');
+            navLinks.classList.toggle('active');
+        }
+        settingsTrigger.addEventListener('click', toggleDrawer);
+        navSettings.addEventListener('click', toggleDrawer);
+
+        // Save Settings
+        document.getElementById('saveSettings').addEventListener('click', async () => {
+            const token = document.getElementById('botToken').value.trim();
+            const chatId = document.getElementById('chatId').value.trim();
+            if (!token || !chatId) return alert("Fill all fields!");
+
+            localStorage.setItem('tg_bot_token', token);
+            localStorage.setItem('tg_chat_id', chatId);
+
+            try {
+                const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=✅ Bot Connected Successfully!`);
+                if (res.ok) alert("✅ Settings Saved & Verified!");
+                else alert("❌ Invalid Token or Chat ID");
+            } catch (e) {
+                alert("❌ Network Error");
+            }
+        });
+
+        // Copy Link with Base64 Data
+        const toast = document.getElementById('toast');
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const file = this.dataset.link;
+                const base = window.location.origin + window.location.pathname.split('/').slice(0, -1).join('/');
+                const fullUrl = (base === '/' ? '' : base) + '/' + file;
+                
+                const token = localStorage.getItem('tg_bot_token');
+                const chatId = localStorage.getItem('tg_chat_id');
+                
+                if (!token || !chatId) return alert("Please set your Bot Token and Chat ID first!");
+
+                // Encode settings into Base64
+                const config = { token, chatId };
+                const encoded = btoa(JSON.stringify(config));
+                const finalUrl = `${fullUrl}?tg_data=${encodeURIComponent(encoded)}`;
+
+                await navigator.clipboard.writeText(finalUrl);
+                
+                toast.classList.add('show');
+                this.textContent = '✓';
+                this.classList.add('copied');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    this.textContent = 'copy';
+                    this.classList.remove('copied');
+                }, 2000);
+            });
+        });
+
+        // Load Saved Settings
+        window.onload = () => {
+            document.getElementById('botToken').value = localStorage.getItem('tg_bot_token') || '';
+            document.getElementById('chatId').value = localStorage.getItem('tg_chat_id') || '';
+        };
+
+        // Search Filter
+        document.getElementById('searchInput').addEventListener('input', function() {
+            const q = this.value.toLowerCase();
+            document.querySelectorAll('.tool-card').forEach(card => {
+                const name = card.dataset.name.toLowerCase();
+                card.style.display = name.includes(q) ? 'flex' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>
