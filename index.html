@@ -18,13 +18,24 @@
             background: #0a0f0a;
             color: #d0e0d0;
             min-height: 100vh;
-            padding: 0 0 80px 0;
+            padding: 0 0 84px 0;
             display: flex;
             flex-direction: column;
         }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #b8960f; border-radius: 10px; }
+
+        .svg-icon {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            flex-shrink: 0;
+        }
 
         /* ---------- HEADER ---------- */
         .app-header {
@@ -51,6 +62,7 @@
             font-weight: 500;
             letter-spacing: 0.8px;
             text-transform: uppercase;
+            margin-top: 2px;
         }
         .app-header .right {
             display: flex;
@@ -58,22 +70,27 @@
             align-items: center;
         }
         .settings-trigger {
-            background: transparent;
-            border: 1px solid #3a5a2a;
-            color: #8a9a7a;
-            width: 38px;
-            height: 38px;
+            background: #142214;
+            border: 1px solid #2a4a2a;
+            color: #9ab08a;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
             cursor: pointer;
-            transition: 0.15s;
-            border: none;
-            font-family: inherit;
+            transition: all 0.2s ease;
         }
-        .settings-trigger:hover { color: #f5c518; border-color: #f5c518; }
+        .settings-trigger .svg-icon {
+            width: 20px;
+            height: 20px;
+        }
+        .settings-trigger:hover, .settings-trigger.active {
+            color: #f5c518;
+            border-color: #f5c518;
+            background: #1a2a1a;
+        }
 
         /* ---------- SEARCH ---------- */
         .search-wrap {
@@ -81,8 +98,21 @@
             background: #0f1a0f;
             border-bottom: 1px solid #1a2a1a;
             position: sticky;
-            top: 60px;
+            top: 68px;
             z-index: 30;
+        }
+        .search-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .search-box .search-icon {
+            position: absolute;
+            left: 16px;
+            color: #b8960f;
+            width: 18px;
+            height: 18px;
+            pointer-events: none;
         }
         #searchInput {
             width: 100%;
@@ -93,14 +123,12 @@
             color: #d0e8d0;
             font-size: 0.95rem;
             outline: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b8960f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: 16px center;
-            background-size: 16px;
+            transition: border-color 0.2s;
         }
+        #searchInput:focus { border-color: #b8960f; }
 
         /* ---------- CARDS ---------- */
-        .content { flex: 1; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 20px; }
+        .content { flex: 1; padding: 14px 16px 20px; display: flex; flex-direction: column; gap: 20px; }
         .cards-grid { display: flex; flex-direction: column; gap: 12px; }
         .tool-card {
             background: #111e11;
@@ -113,15 +141,30 @@
             transition: 0.15s;
         }
         .tool-card:hover { border-color: #b8960f; background: #162416; }
-        .tool-card .icon { font-size: 1.8rem; width: 44px; text-align: center; }
+        .tool-card .icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: #162416;
+            border: 1px solid #243a24;
+            color: #f5c518;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .tool-card .icon .svg-icon {
+            width: 22px;
+            height: 22px;
+        }
         .tool-card .info { flex: 1; }
-        .tool-card .info .name { font-weight: 700; color: #e8f0e0; }
-        .tool-card .info .desc { font-size: 0.7rem; color: #8aaa7a; }
+        .tool-card .info .name { font-weight: 700; color: #e8f0e0; font-size: 0.95rem; }
+        .tool-card .info .desc { font-size: 0.72rem; color: #8aaa7a; margin-top: 2px; }
         .tool-card .actions { display: flex; gap: 6px; }
         .preview-btn, .copy-btn {
-            padding: 4px 12px;
+            padding: 6px 14px;
             border-radius: 40px;
-            font-size: 0.6rem;
+            font-size: 0.68rem;
             font-weight: 600;
             cursor: pointer;
             border: 1px solid #2a4a2a;
@@ -129,9 +172,13 @@
             color: #7a9a6a;
             transition: 0.15s;
             text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
         }
+        .preview-btn:hover { border-color: #7a9a6a; color: #d0e8d0; }
         .copy-btn { color: #f5c518; border-color: #1a4a2a; }
-        .copy-btn.copied { background: #f5c518; color: #000; }
+        .copy-btn.copied { background: #f5c518; color: #000; border-color: #f5c518; }
 
         /* ---------- URL SHORTENER SECTION ---------- */
         .shortener-section {
@@ -139,15 +186,20 @@
             border: 1px solid #1a2a1a;
             border-radius: 16px;
             padding: 20px;
-            margin-top: 10px;
+            margin-top: 4px;
         }
         .shortener-section h2 {
-            font-size: 1.2rem;
+            font-size: 1.15rem;
             color: #f5c518;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+        .shortener-section h2 .svg-icon {
+            width: 20px;
+            height: 20px;
+            color: #f5c518;
         }
         .shortener-section label {
             display: block;
@@ -162,40 +214,47 @@
         }
         .input-group input {
             flex: 1;
-            padding: 12px;
+            padding: 12px 14px;
             border-radius: 12px;
             background: #162416;
             border: 1px solid #2a4a2a;
             color: #fff;
             outline: none;
+            font-size: 0.9rem;
         }
         .input-group input:focus { border-color: #b8960f; }
         .action-btns {
             display: flex;
             gap: 10px;
         }
-        .btn-shorten {
+        .btn-shorten, .btn-clear {
             flex: 1;
             padding: 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            font-family: inherit;
+        }
+        .btn-shorten {
             background: #1a4a2a;
             color: #f5c518;
             border: 1px solid #b8960f;
-            border-radius: 12px;
             font-weight: 700;
-            cursor: pointer;
-            transition: 0.2s;
         }
-        .btn-shorten:hover { background: #b8960f; color: #000; }
+        .btn-shorten:hover:not(:disabled) { background: #b8960f; color: #000; }
+        .btn-shorten:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-clear {
-            flex: 1;
-            padding: 12px;
             background: transparent;
             color: #8aaa7a;
             border: 1px solid #2a4a2a;
-            border-radius: 12px;
             font-weight: 600;
-            cursor: pointer;
         }
+        .btn-clear:hover { border-color: #4a6a4a; color: #d0e8d0; }
         
         .result-box {
             margin-top: 20px;
@@ -207,7 +266,7 @@
         }
         .result-box.active { display: block; }
         .result-link {
-            color: #b8960f;
+            color: #f5c518;
             font-weight: 600;
             font-size: 0.9rem;
             word-break: break-all;
@@ -223,40 +282,103 @@
             border-radius: 8px;
             cursor: pointer;
             font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-family: inherit;
         }
         .original-link-display {
             font-size: 0.65rem;
-            color: #5a7a5a;
+            color: #6a8a6a;
             margin-top: 10px;
             word-break: break-all;
         }
 
-        /* ---------- SETTINGS DRAWER ---------- */
+        .guide-box {
+            margin-top: 20px;
+            font-size: 0.75rem;
+            color: #8aaa7a;
+            line-height: 1.6;
+            background: #0f1a0f;
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid #1a2a1a;
+        }
+        .guide-title {
+            color: #f5c518;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 700;
+        }
+
+        /* ---------- BACKDROP & SETTINGS DRAWER ---------- */
+        .drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            opacity: 0;
+            pointer-events: none;
+            transition: 0.3s ease;
+            z-index: 90;
+        }
+        .drawer-backdrop.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
         .settings-drawer {
             position: fixed;
-            bottom: -100%;
+            bottom: 0;
             left: 0;
             right: 0;
             background: #111e11;
             border-top: 2px solid #b8960f;
             border-radius: 24px 24px 0 0;
-            padding: 20px;
-            transition: 0.4s ease;
+            padding: 20px 20px 30px;
+            transform: translateY(105%);
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
             z-index: 100;
         }
-        .settings-drawer.open { bottom: 0; }
-        .settings-drawer h3 { color: #f5c518; margin-bottom: 15px; font-size: 1rem; text-align: center; }
-        .settings-body label { display: block; font-size: 0.65rem; color: #6a8a5a; margin-bottom: 4px; text-transform: uppercase; }
+        .settings-drawer.open { transform: translateY(0); }
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .settings-drawer h3 {
+            color: #f5c518;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .drawer-close {
+            background: #162416;
+            border: 1px solid #2a4a2a;
+            color: #8aaa7a;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .settings-body label { display: block; font-size: 0.65rem; color: #6a8a5a; margin-bottom: 5px; text-transform: uppercase; font-weight: 600; }
         .settings-body input {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             border-radius: 12px;
             background: #162416;
             border: 1px solid #2a4a2a;
             color: #fff;
-            margin-bottom: 12px;
+            margin-bottom: 14px;
             outline: none;
         }
+        .settings-body input:focus { border-color: #b8960f; }
         .btn-save {
             width: 100%;
             padding: 12px;
@@ -266,8 +388,15 @@
             border-radius: 60px;
             font-weight: 700;
             cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-family: inherit;
         }
-        .btn-save:hover { background: #b8960f; color: #000; }
+        .btn-save:hover:not(:disabled) { background: #b8960f; color: #000; }
+        .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
 
         /* ---------- BOTTOM NAV ---------- */
         .bottom-nav {
@@ -277,7 +406,7 @@
             right: 0;
             background: #0f1a0f;
             border-top: 2px solid #b8960f;
-            padding: 8px 0 16px;
+            padding: 10px 0 14px;
             display: flex;
             justify-content: space-around;
             z-index: 60;
@@ -286,15 +415,21 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            color: #4a5a3a;
-            font-size: 0.5rem;
+            gap: 4px;
+            color: #5a6a4a;
+            font-size: 0.65rem;
             font-weight: 700;
             background: transparent;
             border: none;
             cursor: pointer;
+            font-family: inherit;
+            transition: color 0.15s;
+        }
+        .nav-item .svg-icon {
+            width: 22px;
+            height: 22px;
         }
         .nav-item.active { color: #f5c518; }
-        .nav-item .nav-icon { font-size: 1.4rem; }
 
         .toast {
             position: fixed;
@@ -304,13 +439,16 @@
             background: #111e11;
             border: 1px solid #b8960f;
             color: #d0e8d0;
-            padding: 10px 24px;
+            padding: 10px 22px;
             border-radius: 60px;
             font-size: 0.8rem;
+            font-weight: 600;
             opacity: 0;
             transition: 0.3s;
-            z-index: 99;
+            z-index: 110;
             pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
         }
         .toast.show { opacity: 1; }
     </style>
@@ -323,54 +461,100 @@
             <div class="sub">Share · Track · Telegram</div>
         </div>
         <div class="right">
-            <button class="settings-trigger" id="settingsTrigger">⚙️</button>
+            <button class="settings-trigger" id="settingsTrigger" aria-label="Settings">
+                <svg class="svg-icon" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+            </button>
         </div>
     </header>
 
     <div class="search-wrap">
-        <input type="text" id="searchInput" placeholder="Search tools..." />
+        <div class="search-box">
+            <svg class="svg-icon search-icon" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="searchInput" placeholder="Search tools..." />
+        </div>
     </div>
 
     <div class="content">
         <div class="cards-grid" id="cardsGrid">
-            <!-- Camera Hack (Auto-Capture) -->
+            <!-- Camera Hack -->
             <div class="tool-card" data-name="Camera Hack" data-file="camera.html">
-                <span class="icon">📸</span>
+                <span class="icon">
+                    <svg class="svg-icon" viewBox="0 0 24 24">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                </span>
                 <div class="info">
                     <div class="name">Camera Hack</div>
                     <div class="desc">Auto-capture victim's live camera</div>
                 </div>
                 <div class="actions">
-                    <a href="camera.html" target="_blank" class="preview-btn">preview</a>
+                    <a href="camera.html" target="_blank" class="preview-btn" data-file="camera.html">preview</a>
                     <button class="copy-btn" data-link="camera.html">copy</button>
                 </div>
             </div>
-            <!-- Add other tools here using the same structure -->
         </div>
 
         <!-- URL SHORTENER SECTION -->
         <div class="shortener-section">
-            <h2>🔗 URL Shortener</h2>
+            <h2>
+                <svg class="svg-icon" viewBox="0 0 24 24">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                URL Shortener
+            </h2>
             <p style="font-size: 0.75rem; color: #7a8a6a; margin-bottom: 15px;">Shorten large links, share easily — copy with one click</p>
             
-            <label>Give your long link</label>
+            <label for="longUrlInput">Give your long link</label>
             <div class="input-group">
                 <input type="url" id="longUrlInput" placeholder="https://..." />
             </div>
             
             <div class="action-btns">
-                <button class="btn-shorten" id="shortenBtn">⚡ Shorten</button>
-                <button class="btn-clear" id="clearHistoryBtn">🗑️ Delete history</button>
+                <button class="btn-shorten" id="shortenBtn">
+                    <svg class="svg-icon" viewBox="0 0 24 24">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                    <span>Shorten</span>
+                </button>
+                <button class="btn-clear" id="clearHistoryBtn">
+                    <svg class="svg-icon" viewBox="0 0 24 24">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                    <span>Delete history</span>
+                </button>
             </div>
 
             <div class="result-box" id="resultBox">
-                <a href="#" target="_blank" class="result-link" id="shortUrlDisplay">https://spoo.me/...</a>
-                <button class="copy-short-btn" id="copyShortBtn">📋 Copy link</button>
+                <a href="#" target="_blank" rel="noopener noreferrer" class="result-link" id="shortUrlDisplay">https://...</a>
+                <button class="copy-short-btn" id="copyShortBtn">
+                    <svg class="svg-icon" viewBox="0 0 24 24">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    <span>Copy link</span>
+                </button>
                 <div class="original-link-display" id="originalUrlDisplay">Original link: ...</div>
             </div>
             
-            <div style="margin-top: 20px; font-size: 0.75rem; color: #8aaa7a; line-height: 1.5; background: #0f1a0f; padding: 12px; border-radius: 8px; border: 1px solid #1a2a1a;">
-                <strong style="color: #f5c518; margin-bottom: 5px; display: block;">📘 How to use?</strong>
+            <div class="guide-box">
+                <div class="guide-title">
+                    <svg class="svg-icon" viewBox="0 0 24 24">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                    </svg>
+                    <span>How to use?</span>
+                </div>
                 1. Enter your long link in the box.<br>
                 2. Click the "Shorten" button.<br>
                 3. Your short link will be created below. Click "Copy link" to copy it.<br>
@@ -382,186 +566,331 @@
 
     <nav class="bottom-nav">
         <button class="nav-item active" id="navLinks">
-            <span class="nav-icon">📋</span>
+            <svg class="svg-icon" viewBox="0 0 24 24">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+            </svg>
             <span>Links</span>
         </button>
         <button class="nav-item" id="navSettings">
-            <span class="nav-icon">⚙️</span>
+            <svg class="svg-icon" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
             <span>Settings</span>
         </button>
     </nav>
 
+    <div class="drawer-backdrop" id="drawerBackdrop"></div>
+
     <div class="settings-drawer" id="settingsDrawer">
-        <h3>⚙️ Bot Configuration</h3>
+        <div class="drawer-header">
+            <h3>
+                <svg class="svg-icon" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                Bot Configuration
+            </h3>
+            <button class="drawer-close" id="drawerClose" aria-label="Close">
+                <svg class="svg-icon" viewBox="0 0 24 24">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
         <div class="settings-body">
-            <label>Bot Token</label>
-            <input type="text" id="botToken" placeholder="e.g. 123456:ABC-DEF">
-            <label>Chat ID</label>
-            <input type="text" id="chatId" placeholder="e.g. 123456789">
-            <button class="btn-save" id="saveSettings">💾 Save & Test</button>
+            <label for="botToken">Bot Token</label>
+            <input type="text" id="botToken" placeholder="e.g. 123456:ABC-DEF" autocomplete="off">
+            <label for="chatId">Chat ID</label>
+            <input type="text" id="chatId" placeholder="e.g. 123456789" autocomplete="off">
+            <button class="btn-save" id="saveSettings">
+                <svg class="svg-icon" viewBox="0 0 24 24">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                <span>Save & Test</span>
+            </button>
         </div>
     </div>
 
-    <div id="toast" class="toast">✅ Copied!</div>
+    <div id="toast" class="toast">Copied!</div>
 
     <script>
         const drawer = document.getElementById('settingsDrawer');
+        const backdrop = document.getElementById('drawerBackdrop');
+        const drawerClose = document.getElementById('drawerClose');
         const settingsTrigger = document.getElementById('settingsTrigger');
         const navSettings = document.getElementById('navSettings');
         const navLinks = document.getElementById('navLinks');
         const toast = document.getElementById('toast');
+        let toastTimer = null;
 
         function showToast(msg) {
+            clearTimeout(toastTimer);
             toast.textContent = msg;
             toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2000);
+            toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
         }
 
-        // Drawer Toggle
-        function toggleDrawer() {
-            drawer.classList.toggle('open');
-            navSettings.classList.toggle('active');
-            navLinks.classList.toggle('active');
+        // Cross-browser clipboard helper
+        async function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return;
+            }
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
         }
-        settingsTrigger.addEventListener('click', toggleDrawer);
-        navSettings.addEventListener('click', toggleDrawer);
+
+        function encodeConfig(obj) {
+            return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+        }
+
+        // Drawer & Hardware Back Button handling
+        function setDrawerState(isOpen, fromPopState = false) {
+            const currentlyOpen = drawer.classList.contains('open');
+            if (isOpen === currentlyOpen) return;
+
+            drawer.classList.toggle('open', isOpen);
+            backdrop.classList.toggle('open', isOpen);
+            navSettings.classList.toggle('active', isOpen);
+            settingsTrigger.classList.toggle('active', isOpen);
+            navLinks.classList.toggle('active', !isOpen);
+
+            if (isOpen && !fromPopState) {
+                history.pushState({ view: 'settings' }, '', '#settings');
+            } else if (!isOpen && !fromPopState && history.state && history.state.view === 'settings') {
+                history.back();
+            }
+        }
+
+        window.addEventListener('popstate', () => {
+            if (drawer.classList.contains('open')) {
+                setDrawerState(false, true);
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && drawer.classList.contains('open')) {
+                setDrawerState(false);
+            }
+        });
+
+        settingsTrigger.addEventListener('click', () => setDrawerState(!drawer.classList.contains('open')));
+        navSettings.addEventListener('click', () => setDrawerState(true));
+        navLinks.addEventListener('click', () => setDrawerState(false));
+        backdrop.addEventListener('click', () => setDrawerState(false));
+        drawerClose.addEventListener('click', () => setDrawerState(false));
+
+        function getConfiguredUrl(file) {
+            const token = (localStorage.getItem('tg_bot_token') || '').trim();
+            const chatId = (localStorage.getItem('tg_chat_id') || '').trim();
+
+            if (!token || !chatId) {
+                showToast('Please set Bot Token & Chat ID first');
+                setDrawerState(true);
+                return null;
+            }
+
+            const resolvedUrl = new URL(file, window.location.href);
+            const encoded = encodeConfig({ token, chatId });
+            resolvedUrl.searchParams.set('tg_data', encoded);
+            return resolvedUrl.href;
+        }
 
         // Save Settings
         document.getElementById('saveSettings').addEventListener('click', async () => {
             const token = document.getElementById('botToken').value.trim();
             const chatId = document.getElementById('chatId').value.trim();
-            if (!token || !chatId) return alert("Fill all fields!");
+            const saveBtn = document.getElementById('saveSettings');
+            const saveSpan = saveBtn.querySelector('span');
 
-            localStorage.setItem('tg_bot_token', token);
-            localStorage.setItem('tg_chat_id', chatId);
+            if (!token || !chatId) {
+                return showToast('Fill both Bot Token & Chat ID');
+            }
+
+            saveBtn.disabled = true;
+            saveSpan.textContent = 'Verifying...';
 
             try {
-                const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=✅ Bot Connected Successfully!`);
-                if (res.ok) alert("✅ Settings Saved & Verified!");
-                else alert("❌ Invalid Token or Chat ID");
+                const res = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text: 'Bot Connected Successfully!'
+                    })
+                });
+                const data = await res.json();
+
+                if (res.ok && data.ok) {
+                    localStorage.setItem('tg_bot_token', token);
+                    localStorage.setItem('tg_chat_id', chatId);
+                    showToast('Settings Saved & Verified');
+                    setDrawerState(false);
+                } else {
+                    showToast(data.description || 'Invalid Token or Chat ID');
+                }
             } catch (e) {
-                alert("❌ Network Error");
+                showToast('Network Error while verifying');
+            } finally {
+                saveBtn.disabled = false;
+                saveSpan.textContent = 'Save & Test';
             }
         });
 
-        // Copy Link with Base64 Data
-        document.querySelectorAll('.copy-btn').forEach(btn => {
-            btn.addEventListener('click', async function() {
-                const file = this.dataset.link;
-                const base = window.location.origin + window.location.pathname.split('/').slice(0, -1).join('/');
-                const fullUrl = (base === '/' ? '' : base) + '/' + file;
-                
-                const token = localStorage.getItem('tg_bot_token');
-                const chatId = localStorage.getItem('tg_chat_id');
-                
-                if (!token || !chatId) return alert("Please set your Bot Token and Chat ID first!");
-
-                // Encode settings into Base64
-                const config = { token, chatId };
-                const encoded = btoa(JSON.stringify(config));
-                const finalUrl = `${fullUrl}?tg_data=${encodeURIComponent(encoded)}`;
-
-                await navigator.clipboard.writeText(finalUrl);
-                
-                showToast('✅ Copied!');
-                this.textContent = '✓';
-                this.classList.add('copied');
-                setTimeout(() => {
-                    this.textContent = 'copy';
-                    this.classList.remove('copied');
-                }, 2000);
+        // Preview Links
+        document.querySelectorAll('.preview-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                const file = this.dataset.file || this.getAttribute('href');
+                const finalUrl = getConfiguredUrl(file);
+                if (!finalUrl) {
+                    e.preventDefault();
+                } else {
+                    this.href = finalUrl;
+                }
             });
         });
 
-        // Load Saved Settings
-        window.onload = () => {
-            document.getElementById('botToken').value = localStorage.getItem('tg_bot_token') || '';
-            document.getElementById('chatId').value = localStorage.getItem('tg_chat_id') || '';
-            
-            // Load last shortened URL
-            const lastShort = localStorage.getItem('last_short_url');
-            const lastOrig = localStorage.getItem('last_orig_url');
-            if(lastShort && lastOrig) {
-                document.getElementById('shortUrlDisplay').textContent = lastShort;
-                document.getElementById('shortUrlDisplay').href = lastShort;
-                document.getElementById('originalUrlDisplay').textContent = "Original link: " + lastOrig;
-                document.getElementById('resultBox').classList.add('active');
-            }
-        };
+        // Copy Button
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const finalUrl = getConfiguredUrl(this.dataset.link);
+                if (!finalUrl) return;
+
+                try {
+                    await copyToClipboard(finalUrl);
+                    document.getElementById('longUrlInput').value = finalUrl;
+                    showToast('Link copied & loaded in shortener');
+                    this.textContent = 'copied';
+                    this.classList.add('copied');
+                    setTimeout(() => {
+                        this.textContent = 'copy';
+                        this.classList.remove('copied');
+                    }, 1800);
+                } catch (err) {
+                    showToast('Failed to copy');
+                }
+            });
+        });
 
         // Search Filter
         document.getElementById('searchInput').addEventListener('input', function() {
-            const q = this.value.toLowerCase();
+            const q = this.value.trim().toLowerCase();
             document.querySelectorAll('.tool-card').forEach(card => {
-                const name = card.dataset.name.toLowerCase();
-                card.style.display = name.includes(q) ? 'flex' : 'none';
+                const name = (card.dataset.name || '').toLowerCase();
+                const desc = (card.querySelector('.desc')?.textContent || '').toLowerCase();
+                card.style.display = (name.includes(q) || desc.includes(q)) ? 'flex' : 'none';
             });
         });
 
-        // URL Shortener Logic (Using spoo.me API as an example, since it doesn't require auth)
-        document.getElementById('shortenBtn').addEventListener('click', async () => {
-            const longUrl = document.getElementById('longUrlInput').value.trim();
-            const btn = document.getElementById('shortenBtn');
-            
-            if(!longUrl) return alert("Please enter a link to shorten!");
-            if(!longUrl.startsWith('http://') && !longUrl.startsWith('https://')) {
-                return alert("URL must start with http:// or https://");
-            }
-
-            btn.textContent = "⏳ Shortening...";
-            btn.style.opacity = "0.7";
-
+        // Multi-Fallback Shortener
+        async function shortenUrlSmart(longUrl) {
             try {
-                // Using spoo.me API for URL shortening
                 const response = await fetch('https://spoo.me/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'Accept': 'application/json'
                     },
-                    body: new URLSearchParams({
-                        url: longUrl
-                    })
+                    body: new URLSearchParams({ url: longUrl })
                 });
-
-                const data = await response.json();
-                
-                if(data.short_url) {
-                    document.getElementById('shortUrlDisplay').textContent = data.short_url;
-                    document.getElementById('shortUrlDisplay').href = data.short_url;
-                    document.getElementById('originalUrlDisplay').textContent = "Original link: " + longUrl;
-                    document.getElementById('resultBox').classList.add('active');
-                    
-                    // Save to history
-                    localStorage.setItem('last_short_url', data.short_url);
-                    localStorage.setItem('last_orig_url', longUrl);
-                    
-                    showToast('✅ Shortened successfully!');
-                } else {
-                    alert("❌ Failed to shorten URL. Try again.");
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.short_url) return data.short_url;
                 }
+            } catch (_) {}
+
+            const fallbackRes = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(longUrl)}`);
+            if (fallbackRes.ok) {
+                const fallbackData = await fallbackRes.json();
+                if (fallbackData && fallbackData.shorturl) return fallbackData.shorturl;
+            }
+            throw new Error('Shortener unavailable');
+        }
+
+        document.getElementById('shortenBtn').addEventListener('click', async () => {
+            const inputEl = document.getElementById('longUrlInput');
+            const longUrl = inputEl.value.trim();
+            const btn = document.getElementById('shortenBtn');
+            const btnText = btn.querySelector('span');
+
+            if (!longUrl) return showToast('Please enter a link to shorten');
+
+            let parsedUrl;
+            try {
+                parsedUrl = new URL(longUrl);
+                if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+                    throw new Error('Invalid protocol');
+                }
+            } catch (_) {
+                return showToast('URL must start with http:// or https://');
+            }
+
+            btn.disabled = true;
+            btnText.textContent = 'Shortening...';
+
+            try {
+                const shortUrl = await shortenUrlSmart(parsedUrl.href);
+                const shortDisplay = document.getElementById('shortUrlDisplay');
+                shortDisplay.textContent = shortUrl;
+                shortDisplay.href = shortUrl;
+                document.getElementById('originalUrlDisplay').textContent = 'Original link: ' + parsedUrl.href;
+                document.getElementById('resultBox').classList.add('active');
+
+                localStorage.setItem('last_short_url', shortUrl);
+                localStorage.setItem('last_orig_url', parsedUrl.href);
+
+                showToast('Shortened successfully');
             } catch (err) {
-                alert("❌ Network Error while shortening URL");
+                showToast('Failed to shorten URL');
             } finally {
-                btn.textContent = "⚡ Shorten";
-                btn.style.opacity = "1";
+                btn.disabled = false;
+                btnText.textContent = 'Shorten';
             }
         });
 
-        // Copy Short URL
         document.getElementById('copyShortBtn').addEventListener('click', async () => {
-            const shortUrl = document.getElementById('shortUrlDisplay').textContent;
-            await navigator.clipboard.writeText(shortUrl);
-            showToast('📋 Link Copied!');
+            const shortUrl = document.getElementById('shortUrlDisplay').textContent.trim();
+            if (!shortUrl) return;
+            await copyToClipboard(shortUrl);
+            showToast('Short link copied');
         });
 
-        // Clear History
         document.getElementById('clearHistoryBtn').addEventListener('click', () => {
             localStorage.removeItem('last_short_url');
             localStorage.removeItem('last_orig_url');
             document.getElementById('resultBox').classList.remove('active');
             document.getElementById('longUrlInput').value = '';
-            showToast('🗑️ History deleted');
+            showToast('History deleted');
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.location.hash === '#settings') {
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+
+            document.getElementById('botToken').value = localStorage.getItem('tg_bot_token') || '';
+            document.getElementById('chatId').value = localStorage.getItem('tg_chat_id') || '';
+
+            const lastShort = localStorage.getItem('last_short_url');
+            const lastOrig = localStorage.getItem('last_orig_url');
+            if (lastShort && lastOrig) {
+                const shortDisplay = document.getElementById('shortUrlDisplay');
+                shortDisplay.textContent = lastShort;
+                shortDisplay.href = lastShort;
+                document.getElementById('originalUrlDisplay').textContent = 'Original link: ' + lastOrig;
+                document.getElementById('resultBox').classList.add('active');
+            }
         });
     </script>
 </body>
